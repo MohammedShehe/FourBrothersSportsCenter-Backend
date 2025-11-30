@@ -202,7 +202,9 @@ exports.generateOrderOtp = async (req, res) => {
 
     await db.query("UPDATE orders SET otp=?, status='Imepokelewa_PENDING' WHERE id=?", [otp, order_id]);
 
-    try { await sendOTPSMS(order.phone, `Your OTP to confirm order ${order_id} is: ${otp}`); } 
+    const { normalizeTanzaniaNumber } = require('../utils/helpers');
+    const normalizedPhone = normalizeTanzaniaNumber(order.phone);
+    try { await sendOTPSMS(normalizedPhone, `Your OTP to confirm order ${order_id} is: ${otp}`); } 
     catch (smsErr) { console.error(`Failed to send OTP SMS for order ${order_id}:`, smsErr.message); }
 
     res.json({ message: "OTP generated", otp }); // optional

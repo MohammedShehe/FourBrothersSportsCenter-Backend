@@ -24,23 +24,46 @@ exports.login = async (req, res) => {
 
     const admin = rows[0];
 
-    // Generate OTP
+    // ---------------------- RATE LIMIT CHECK ----------------------
+    const rateLimitMinutes = 10;
+    const maxRequests = 3;
+    const since = new Date(Date.now() - rateLimitMinutes * 60 * 1000);
+
+    const [recentOtps] = await db.query(
+      "SELECT COUNT(*) AS count FROM admin_otps WHERE user_id=? AND created_at >= ?",
+      [admin.id, since]
+    );
+
+    if (recentOtps[0].count >= maxRequests) {
+      return res.status(429).json({
+        message: `Too many OTP requests. Please wait ${rateLimitMinutes} minutes before trying again.`
+      });
+    }
+
+    // Invalidate previous OTPs for this admin
+    await db.query("UPDATE admin_otps SET verified=1 WHERE user_id=? AND verified=0", [admin.id]);
+
+    // Generate new OTP
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + (process.env.OTP_EXPIRES_MINUTES || 5) * 60 * 1000);
 
     // Save OTP to DB
     await db.query(
-      "INSERT INTO admin_otps (user_id, otp_code, expires_at, verified) VALUES (?, ?, ?, 0)",
+      "INSERT INTO admin_otps (user_id, otp_code, expires_at, verified, created_at) VALUES (?, ?, ?, 0, NOW())",
       [admin.id, otp, expiresAt]
     );
 
+    const { sendBulkEmail, sendOTPSMS, normalizeTanzaniaNumber } = require('../utils/helpers');
+
     // Send OTP via SMS
     try {
-      await sendOTPSMS(admin.mobile, otp);
+      if (admin.mobile) {
+        const normalizedPhone = normalizeTanzaniaNumber(admin.mobile);
+        await sendOTPSMS(normalizedPhone, otp);
+      }
     } catch (e) {
       console.error("⚠️ Failed to send OTP via SMS:", e.message);
     }
-
     // Also send OTP via email if admin has email
     if (admin.email) {
       try {
@@ -67,7 +90,7 @@ exports.verifyOtp = async (req, res) => {
     const { first_name, last_name, otp } = req.body;
 
     if (!first_name || !last_name || !otp) {
-      return res.status(400).json({ message: "First name, last name, and OTP are required" });
+      return res.status(400).json({ message: "First name, last name and OTP are required" });
     }
 
     // Check admin exists

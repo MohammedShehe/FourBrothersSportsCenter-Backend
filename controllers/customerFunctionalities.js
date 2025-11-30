@@ -7,6 +7,8 @@ const {
   sendOtpToEmail,
   otpExpireMinutes
 } = require('../utils/otp');
+
+const { normalizeTanzaniaNumber, sendOTPSMS } = require('../utils/helpers');
 const {
   generateAccessToken,
   generateRefreshToken,
@@ -62,24 +64,39 @@ async function sendOtp(req, res) {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ message: 'Phone is required' });
 
-    const [custRows] = await pool.execute('SELECT id FROM customers WHERE phone = ?', [phone]);
-    if (custRows.length === 0) return res.status(404).json({ message: 'Phone not registered.' });
+    // Normalize to +255 format
+    const normalizedPhone = normalizeTanzaniaNumber(phone);
 
+    // Check customer exists (match against raw phone stored in DB)
+    const [custRows] = await pool.execute('SELECT id FROM customers WHERE phone = ?', [phone]);
+    if (custRows.length === 0) {
+      return res.status(404).json({ message: 'Phone not registered.' });
+    }
+
+    const customerId = custRows[0].id;
+
+    // Invalidate previous OTPs
+    await pool.execute("UPDATE customer_otps SET used=1 WHERE customer_id=? AND used=0", [customerId]);
+
+    // Generate new OTP
     const otp = generateOTP();
 
+    // Save OTP with normalized phone
     await pool.execute(
       `INSERT INTO customer_otps (customer_id, phone, otp, expires_at, used) 
        VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), 0)`,
-      [custRows[0].id, phone, otp, otpExpireMinutes]
+      [customerId, normalizedPhone, otp, otpExpireMinutes]
     );
 
-    const sendRes = await sendOtpToNumber(phone, otp);
-    if (!sendRes.success)
+    // Send OTP via Twilio
+    const sendRes = await sendOTPSMS(normalizedPhone, otp);
+    if (!sendRes.success) {
       return res.status(500).json({ message: 'Failed to send OTP', error: sendRes.error });
+    }
 
     return res.status(200).json({ message: 'OTP sent. It expires shortly.' });
   } catch (err) {
-    console.error(err);
+    console.error("Customer Send OTP Error:", err);
     return res.status(500).json({ message: 'Server error' });
   }
 }

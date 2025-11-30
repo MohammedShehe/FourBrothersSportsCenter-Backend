@@ -38,6 +38,8 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Server error', error: err.message });
 });
 
+require('./utils/otpCleaner'); // Start OTP cleanup task
+
 // ----------------- Start Server -----------------
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

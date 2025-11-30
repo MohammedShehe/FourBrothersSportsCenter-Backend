@@ -1,6 +1,6 @@
 const db = require('../config/database');
 const jwt = require('jsonwebtoken');
-const { generateOTP, sendOTPSMS, sendBulkEmail } = require('../utils/helpers');
+const { generateOTP, sendOTPSMS } = require('../utils/helpers');
 require('dotenv').config();
 
 // ---------------------- ADMIN LOGIN (SEND OTP) ----------------------
@@ -53,31 +53,16 @@ exports.login = async (req, res) => {
       [admin.id, otp, expiresAt]
     );
 
-    const { sendBulkEmail, sendOTPSMS, normalizeTanzaniaNumber } = require('../utils/helpers');
-
-    // Send OTP via SMS
+    // Send OTP via SMS only
     try {
       if (admin.mobile) {
-        const normalizedPhone = normalizeTanzaniaNumber(admin.mobile);
-        await sendOTPSMS(normalizedPhone, otp);
+        await sendOTPSMS(admin.mobile, `Your OTP to login is: ${otp}`);
       }
     } catch (e) {
       console.error("⚠️ Failed to send OTP via SMS:", e.message);
     }
-    // Also send OTP via email if admin has email
-    if (admin.email) {
-      try {
-        await sendBulkEmail(
-          [admin.email],
-          "Your Admin OTP Code",
-          `Hello ${admin.first_name},\n\nYour OTP code is: ${otp}\nIt will expire in ${process.env.OTP_EXPIRES_MINUTES || 5} minutes.\n\nRegards,\nSystem`
-        );
-      } catch (e) {
-        console.error("⚠️ Failed to send OTP via Email:", e.message);
-      }
-    }
 
-    res.json({ message: "OTP sent to registered mobile/email" });
+    res.json({ message: "OTP sent to registered mobile number" });
   } catch (err) {
     console.error("Admin Login Error:", err);
     res.status(500).json({ message: "Server error" });

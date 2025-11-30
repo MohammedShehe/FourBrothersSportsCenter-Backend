@@ -1,5 +1,8 @@
+// controllers/notificationController.js
+
 const db = require('../config/database');
 const { sendBulkEmail, sendOTPSMS } = require('../utils/helpers');
+const cloudinary = require('../config/cloudinary');
 
 // ---------------- Ads Management ----------------
 exports.postAd = async (req, res) => {
@@ -7,10 +10,22 @@ exports.postAd = async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "Image is required" });
 
     const { link } = req.body;
-    const imageUrl = `/uploads/products/${req.file.filename}`;
 
-    await db.query("INSERT INTO ads (image_url, link) VALUES (?, ?)", [imageUrl, link || null]);
-    res.status(201).json({ message: "Ad posted successfully" });
+    // Upload to Cloudinary
+    const uploaded = await cloudinary.uploader.upload(req.file.path, {
+      folder: "four_brothers_ads"
+    });
+
+    await db.query(
+      "INSERT INTO ads (image_url, link) VALUES (?, ?)",
+      [uploaded.secure_url, link || null]
+    );
+
+    res.status(201).json({
+      message: "Ad posted successfully",
+      image_url: uploaded.secure_url
+    });
+
   } catch (err) {
     console.error("Post Ad Error:", err);
     res.status(500).json({ message: "Server error" });
@@ -30,13 +45,24 @@ exports.getAds = async (req, res) => {
 exports.deleteAd = async (req, res) => {
   try {
     const { id } = req.params;
-    const [result] = await db.query("DELETE FROM ads WHERE id = ?", [id]);
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Ad not found" });
+    const [rows] = await db.query("SELECT image_url FROM ads WHERE id=?", [id]);
+    if (rows.length === 0) return res.status(404).json({ message: "Ad not found" });
+
+    // Extract Cloudinary public_id
+    const imageUrl = rows[0].image_url;
+    const publicId = imageUrl.split('/').slice(-1)[0].split('.')[0];
+
+    // Delete from cloudinary
+    try {
+      await cloudinary.uploader.destroy("four_brothers_ads/" + publicId);
+    } catch (err) {
+      console.warn("Cloudinary delete failed, continuing...");
     }
 
+    await db.query("DELETE FROM ads WHERE id = ?", [id]);
     res.json({ message: "Ad deleted successfully" });
+
   } catch (err) {
     console.error("Delete Ad Error:", err);
     res.status(500).json({ message: "Server error" });
@@ -60,7 +86,6 @@ exports.viewCustomerNotifications = async (req, res) => {
   }
 };
 
-// 🔹 Email notification (with log type=email)
 exports.sendMessage = async (req, res) => {
   try {
     const { content, customer_ids } = req.body;
@@ -84,7 +109,6 @@ exports.sendMessage = async (req, res) => {
 
     await sendBulkEmail(emails, "Notification from Four Brothers Sports Center", content);
 
-    // Log admin notification
     await db.query("INSERT INTO admin_notifications (content, type) VALUES (?, 'email')", [content]);
 
     res.json({ message: "Email notification sent successfully" });
@@ -94,7 +118,6 @@ exports.sendMessage = async (req, res) => {
   }
 };
 
-// 🔹 In-app announcement (with log type=announcement)
 exports.sendInAppMessageOnly = async (req, res) => {
   try {
     const { content, customer_ids } = req.body;
@@ -102,7 +125,6 @@ exports.sendInAppMessageOnly = async (req, res) => {
       return res.status(400).json({ message: "Message content is required" });
     }
 
-    // Delete old announcements
     await db.query("DELETE FROM admin_notifications WHERE type='announcement'");
 
     let inserted = 0;
@@ -110,9 +132,7 @@ exports.sendInAppMessageOnly = async (req, res) => {
     if (Array.isArray(customer_ids) && customer_ids.length > 0) {
       const placeholders = customer_ids.map(() => "(?, ?, 'announcement')").join(",");
       const params = [];
-      customer_ids.forEach(id => {
-        params.push(id, content);
-      });
+      customer_ids.forEach(id => params.push(id, content));
 
       const [result] = await db.query(
         `INSERT INTO admin_notifications (id, content, type) VALUES ${placeholders}`,
@@ -137,7 +157,6 @@ exports.sendInAppMessageOnly = async (req, res) => {
 
 // ---------------- Orders Management ----------------
 
-// Get all orders (join with order_items)
 exports.getAllOrders = async (req, res) => {
   try {
     const [orders] = await db.query(`
@@ -157,7 +176,6 @@ exports.getAllOrders = async (req, res) => {
   }
 };
 
-// Update order status
 exports.updateOrderStatus = async (req, res) => {
   try {
     const { order_id } = req.params;
@@ -178,16 +196,16 @@ exports.updateOrderStatus = async (req, res) => {
   }
 };
 
-// Generate OTP for order reception
 exports.generateOrderOtp = async (req, res) => {
   try {
     const { order_id } = req.params;
 
-    const [orders] = await db.query(`
-      SELECT o.id, o.customer_id, o.status, c.phone
-      FROM orders o
-      JOIN customers c ON o.customer_id = c.id
-      WHERE o.id=?`, [order_id]
+    const [orders] = await db.query(
+      `SELECT o.id, o.customer_id, o.status, c.phone
+       FROM orders o
+       JOIN customers c ON o.customer_id = c.id
+       WHERE o.id=?`,
+      [order_id]
     );
 
     if (orders.length === 0) return res.status(404).json({ message: "Order not found" });
@@ -204,17 +222,21 @@ exports.generateOrderOtp = async (req, res) => {
 
     const { normalizeTanzaniaNumber } = require('../utils/helpers');
     const normalizedPhone = normalizeTanzaniaNumber(order.phone);
-    try { await sendOTPSMS(normalizedPhone, `Your OTP to confirm order ${order_id} is: ${otp}`); } 
-    catch (smsErr) { console.error(`Failed to send OTP SMS for order ${order_id}:`, smsErr.message); }
 
-    res.json({ message: "OTP generated", otp }); // optional
+    try {
+      await sendOTPSMS(normalizedPhone, `Your OTP to confirm order ${order_id} is: ${otp}`);
+    } catch (smsErr) {
+      console.error(`Failed to send OTP SMS for order ${order_id}:`, smsErr.message);
+    }
+
+    res.json({ message: "OTP generated", otp });
+
   } catch (err) {
     console.error("Generate OTP Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// Confirm order reception via OTP
 exports.confirmOrderReception = async (req, res) => {
   try {
     const { order_id } = req.params;
@@ -234,20 +256,22 @@ exports.confirmOrderReception = async (req, res) => {
     await db.query("UPDATE orders SET otp=NULL, status='Imepokelewa' WHERE id=?", [order_id]);
 
     res.json({ message: "Order reception confirmed successfully" });
+
   } catch (err) {
     console.error("Confirm Order OTP Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// Get OTP (optional)
 exports.getOrderOtp = async (req, res) => {
   try {
     const { order_id } = req.params;
     const [rows] = await db.query("SELECT otp FROM orders WHERE id=?", [order_id]);
+
     if (!rows.length) return res.status(404).json({ message: "Order not found" });
 
     res.json({ otp: rows[0].otp });
+
   } catch (err) {
     console.error("Get OTP Error:", err);
     res.status(500).json({ message: "Server error" });

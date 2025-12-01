@@ -41,7 +41,10 @@ exports.login = async (req, res) => {
     }
 
     // Invalidate previous OTPs for this admin
-    await db.query("UPDATE admin_otps SET verified=1 WHERE user_id=? AND verified=0", [admin.id]);
+    await db.query(
+      "UPDATE admin_otps SET verified=1 WHERE user_id=? AND verified=0",
+      [admin.id]
+    );
 
     // Generate new OTP
     const otp = generateOTP();
@@ -53,18 +56,19 @@ exports.login = async (req, res) => {
       [admin.id, otp, expiresAt]
     );
 
-    const { sendBulkEmail, sendOTPSMS } = require('../utils/helpers');
-
-    // Send OTP via SMS
+    // ---------------------- SEND OTP via SMS ----------------------
     try {
-      if (admin.mobile) {
-        await sendOTPSMS(otp);
+      if (!admin.mobile) {
+        console.warn("⚠️ Admin has no mobile number stored.");
+      } else {
+        await sendOTPSMS(otp); // NO PHONE PARAMETER USED
       }
     } catch (e) {
       console.error("⚠️ Failed to send OTP via SMS:", e.message);
     }
 
     res.json({ message: "OTP sent to registered mobile/email" });
+
   } catch (err) {
     console.error("Admin Login Error:", err);
     res.status(500).json({ message: "Server error" });
@@ -110,7 +114,10 @@ exports.verifyOtp = async (req, res) => {
     }
 
     // Mark OTP as verified
-    await db.query("UPDATE admin_otps SET verified=1 WHERE id=?", [otpEntry.id]);
+    await db.query(
+      "UPDATE admin_otps SET verified=1 WHERE id=?",
+      [otpEntry.id]
+    );
 
     // Generate JWT token
     const token = jwt.sign(
@@ -123,6 +130,7 @@ exports.verifyOtp = async (req, res) => {
       message: "OTP verified successfully",
       token
     });
+
   } catch (err) {
     console.error("Verify OTP Error:", err);
     res.status(500).json({ message: "Server error" });

@@ -45,12 +45,18 @@ exports.postAd = async (req, res) => {
 exports.getAds = async (req, res) => {
   try {
     const [ads] = await db.query("SELECT * FROM ads ORDER BY created_at DESC");
-    res.json(ads);
+    res.json(
+      ads.map(ad => ({
+        ...ad,
+        image_url: ad.image_url // already full URL
+      }))
+    );
   } catch (err) {
     console.error("Get Ads Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 exports.deleteAd = async (req, res) => {
   try {

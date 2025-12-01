@@ -8,7 +8,7 @@ const {
   otpExpireMinutes
 } = require('../utils/otp');
 
-const { normalizeTanzaniaNumber, sendOTPSMS } = require('../utils/helpers');
+const { normalizeNumber, sendOTPSMS } = require('../utils/helpers');
 const {
   generateAccessToken,
   generateRefreshToken,
@@ -65,7 +65,7 @@ async function sendOtp(req, res) {
     if (!phone) return res.status(400).json({ message: 'Phone is required' });
 
     // Normalize to +255 format
-    const normalizedPhone = normalizeTanzaniaNumber(phone);
+    const normalizedPhone = normalizeNumber(phone);
 
     // Check customer exists (match against raw phone stored in DB)
     const [custRows] = await pool.execute('SELECT id FROM customers WHERE phone = ?', [phone]);

@@ -14,16 +14,23 @@ function generateOTP() {
 }
 
 // 🔹 Normalize Tanzanian phone numbers to E.164 format (+255...)
-function normalizeTanzaniaNumber(phone) {
+function normalizeNumber(phone) {
   let cleaned = phone.trim();
   cleaned = cleaned.replace(/[^0-9+]/g, '');
 
-  if (cleaned.startsWith('+255')) return cleaned;
+  // If already starts with +, assume it's correct
+  if (cleaned.startsWith('+')) return cleaned;
+
+  // If starts with 0 (local format), add +255 (Tanzania)
   if (cleaned.startsWith('0')) return '+255' + cleaned.substring(1);
+
+  // If starts with 255 (Tanzania without +), add +
   if (cleaned.startsWith('255')) return '+' + cleaned;
 
+  // Otherwise, fallback to +255
   return '+255' + cleaned;
 }
+
 
 /**
  * 🔹 Send OTP via SMS using user ID.
@@ -46,7 +53,7 @@ async function sendOTPSMS(userId, otp) {
     }
 
     // Normalize number to +255 format
-    const mobile = normalizeTanzaniaNumber(rows[0].mobile);
+    const mobile = normalizeNumber(rows[0].mobile);
 
     if (!mobile.startsWith('+')) {
       throw new Error("Mobile number must be in E.164 format starting with +countrycode");
@@ -100,5 +107,5 @@ module.exports = {
   generateOTP,
   sendOTPSMS,
   sendBulkEmail,
-  normalizeTanzaniaNumber
+  normalizeNumber
 };

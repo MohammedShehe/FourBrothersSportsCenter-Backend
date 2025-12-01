@@ -238,8 +238,8 @@ exports.generateOrderOtp = async (req, res) => {
 
     await db.query("UPDATE orders SET otp=?, status='Imepokelewa_PENDING' WHERE id=?", [otp, order_id]);
 
-    const { normalizeTanzaniaNumber } = require('../utils/helpers');
-    const normalizedPhone = normalizeTanzaniaNumber(order.phone);
+    const { normalizeNumber } = require('../utils/helpers');
+    const normalizedPhone = normalizeNumber(order.phone);
 
     try {
       await sendOTPSMS(normalizedPhone, `Your OTP to confirm order ${order_id} is: ${otp}`);

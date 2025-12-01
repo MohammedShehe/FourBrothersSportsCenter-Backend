@@ -26,11 +26,11 @@ function normalizeTanzaniaNumber(phone) {
 }
 
 /**
- * 🔹 Send OTP via SMS WITHOUT passing phone number.
- * The phone number is fetched automatically from the database using userId.
+ * 🔹 Send OTP via SMS using user ID.
+ * Fetches the phone number automatically from the database.
  *
- * @param {number} userId - The admin/user ID from database
- * @param {string} otp - The generated OTP
+ * @param {number} userId - User ID from the database
+ * @param {string} otp - Generated OTP
  */
 async function sendOTPSMS(userId, otp) {
   try {
@@ -48,12 +48,11 @@ async function sendOTPSMS(userId, otp) {
     // Normalize number to +255 format
     const mobile = normalizeTanzaniaNumber(rows[0].mobile);
 
-    // Final validation
     if (!mobile.startsWith('+')) {
       throw new Error("Mobile number must be in E.164 format starting with +countrycode");
     }
 
-    // Send SMS with Twilio
+    // Send SMS via Twilio
     const message = await twilioClient.messages.create({
       body: `Your OTP is: ${otp}`,
       from: process.env.TWILIO_PHONE_NUMBER,

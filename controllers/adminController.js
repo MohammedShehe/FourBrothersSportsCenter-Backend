@@ -12,7 +12,7 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "First name and last name are required" });
     }
 
-    // Check admin exists
+    // Check if admin exists
     const [rows] = await db.query(
       "SELECT * FROM users WHERE first_name=? AND last_name=? AND is_admin=1 LIMIT 1",
       [first_name, last_name]
@@ -40,17 +40,17 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Invalidate previous OTPs for this admin
+    // Invalidate previous unverified OTPs
     await db.query(
       "UPDATE admin_otps SET verified=1 WHERE user_id=? AND verified=0",
       [admin.id]
     );
 
-    // Generate new OTP
+    // ---------------------- GENERATE OTP ----------------------
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + (process.env.OTP_EXPIRES_MINUTES || 5) * 60 * 1000);
 
-    // Save OTP to DB
+    // Save OTP to database
     await db.query(
       "INSERT INTO admin_otps (user_id, otp_code, expires_at, verified, created_at) VALUES (?, ?, ?, 0, NOW())",
       [admin.id, otp, expiresAt]
@@ -61,7 +61,7 @@ exports.login = async (req, res) => {
       if (!admin.mobile) {
         console.warn("⚠️ Admin has no mobile number stored.");
       } else {
-        await sendOTPSMS(admin.mobile, otp); 
+        await sendOTPSMS(admin.mobile, otp);
       }
     } catch (e) {
       console.error("⚠️ Failed to send OTP via SMS:", e.message);
@@ -84,7 +84,7 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ message: "First name, last name and OTP are required" });
     }
 
-    // Check admin exists
+    // Check if admin exists
     const [rows] = await db.query(
       "SELECT * FROM users WHERE first_name=? AND last_name=? AND is_admin=1 LIMIT 1",
       [first_name, last_name]
@@ -108,7 +108,7 @@ exports.verifyOtp = async (req, res) => {
 
     const otpEntry = otpRows[0];
 
-    // Check expiration
+    // Check if OTP has expired
     if (new Date(otpEntry.expires_at) < new Date()) {
       return res.status(400).json({ message: "OTP expired" });
     }

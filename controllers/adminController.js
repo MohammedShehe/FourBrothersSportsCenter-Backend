@@ -61,7 +61,7 @@ exports.login = async (req, res) => {
       if (!admin.mobile) {
         console.warn("⚠️ Admin has no mobile number stored.");
       } else {
-        await sendOTPSMS(otp); // NO PHONE PARAMETER USED
+        await sendOTPSMS(admin.mobile, otp); 
       }
     } catch (e) {
       console.error("⚠️ Failed to send OTP via SMS:", e.message);

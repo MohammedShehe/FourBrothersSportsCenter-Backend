@@ -7,24 +7,34 @@ const cloudinary = require('../config/cloudinary');
 // ---------------- Ads Management ----------------
 exports.postAd = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: "Image is required" });
+    if (!req.file) {
+      return res.status(400).json({ message: "Image is required" });
+    }
 
     const { link } = req.body;
 
-    // Upload to Cloudinary
-    const uploaded = await cloudinary.uploader.upload(req.file.path, {
-      folder: "four_brothers_ads"
-    });
+    // Upload to Cloudinary using buffer
+    const uploadStream = cloudinary.uploader.upload_stream(
+      { folder: "four_brothers_ads" },
+      async (error, result) => {
+        if (error) {
+          console.error("Cloudinary Upload Error:", error);
+          return res.status(500).json({ message: "Cloudinary upload failed" });
+        }
 
-    await db.query(
-      "INSERT INTO ads (image_url, link) VALUES (?, ?)",
-      [uploaded.secure_url, link || null]
+        await db.query(
+          "INSERT INTO ads (image_url, link) VALUES (?, ?)",
+          [result.secure_url, link || null]
+        );
+
+        res.status(201).json({
+          message: "Ad posted successfully",
+          image_url: result.secure_url
+        });
+      }
     );
 
-    res.status(201).json({
-      message: "Ad posted successfully",
-      image_url: uploaded.secure_url
-    });
+    uploadStream.end(req.file.buffer);
 
   } catch (err) {
     console.error("Post Ad Error:", err);
@@ -49,18 +59,20 @@ exports.deleteAd = async (req, res) => {
     const [rows] = await db.query("SELECT image_url FROM ads WHERE id=?", [id]);
     if (rows.length === 0) return res.status(404).json({ message: "Ad not found" });
 
-    // Extract Cloudinary public_id
     const imageUrl = rows[0].image_url;
-    const publicId = imageUrl.split('/').slice(-1)[0].split('.')[0];
 
-    // Delete from cloudinary
+    // Extract Cloudinary public_id
+    const filename = imageUrl.split("/").pop().split(".")[0];
+    const publicId = "four_brothers_ads/" + filename;
+
     try {
-      await cloudinary.uploader.destroy("four_brothers_ads/" + publicId);
+      await cloudinary.uploader.destroy(publicId);
     } catch (err) {
-      console.warn("Cloudinary delete failed, continuing...");
+      console.warn("Cloudinary delete failed:", err.message);
     }
 
-    await db.query("DELETE FROM ads WHERE id = ?", [id]);
+    await db.query("DELETE FROM ads WHERE id=?", [id]);
+
     res.json({ message: "Ad deleted successfully" });
 
   } catch (err) {

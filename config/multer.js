@@ -1,21 +1,18 @@
 // config/multer.js
 const multer = require('multer');
-const path = require('path');
 
-// Use memory storage (files stored in RAM)
+// Store file in memory (RAM)
 const storage = multer.memoryStorage();
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max per image
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max per file
   fileFilter: (req, file, cb) => {
-    const allowed = /jpeg|jpg|png/;
-    const ext = path.extname(file.originalname).toLowerCase();
-
-    if (allowed.test(ext)) {
+    const allowedMime = ["image/jpeg", "image/jpg", "image/png"];
+    if (allowedMime.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only images are allowed (jpg, jpeg, png)'));
+      cb(new Error("Only image files (jpg, jpeg, png) are allowed"));
     }
   }
 });

@@ -1,6 +1,6 @@
 const db = require('../config/database');
 const jwt = require('jsonwebtoken');
-const { generateOTP, sendOTPSMS } = require('../utils/helpers');
+const { generateOTP, sendOTPSMS, sendBulkEmail } = require('../utils/helpers');
 require('dotenv').config();
 
 // ---------------------- ADMIN LOGIN (SEND OTP) ----------------------
@@ -53,16 +53,18 @@ exports.login = async (req, res) => {
       [admin.id, otp, expiresAt]
     );
 
-    // Send OTP via SMS only
+    const { sendBulkEmail, sendOTPSMS } = require('../utils/helpers');
+
+    // Send OTP via SMS
     try {
       if (admin.mobile) {
-        await sendOTPSMS(admin.mobile, `Your OTP to login is: ${otp}`);
+        await sendOTPSMS(otp);
       }
     } catch (e) {
       console.error("⚠️ Failed to send OTP via SMS:", e.message);
     }
 
-    res.json({ message: "OTP sent to registered mobile number" });
+    res.json({ message: "OTP sent to registered mobile/email" });
   } catch (err) {
     console.error("Admin Login Error:", err);
     res.status(500).json({ message: "Server error" });

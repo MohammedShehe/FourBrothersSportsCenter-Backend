@@ -1,39 +1,28 @@
 const nodemailer = require('nodemailer');
-const twilio = require('twilio');
-const db = require('../config/database');
-
-// 🔹 Twilio client setup
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+import axios from "axios"; // Use axios for Termii API
+import db from '../config/database';
+import 'dotenv/config';
 
 // 🔹 Generate 6-digit OTP
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// 🔹 Normalize Tanzanian phone numbers to E.164 format (+255...)
-function normalizeNumber(phone) {
+// 🔹 Normalize phone numbers to E.164 format
+function normalizeNumber(phone, countryCode = '+255') {
   let cleaned = phone.trim();
   cleaned = cleaned.replace(/[^0-9+]/g, '');
 
-  // If already starts with +, assume it's correct
   if (cleaned.startsWith('+')) return cleaned;
 
-  // If starts with 0 (local format), add +255 (Tanzania)
-  if (cleaned.startsWith('0')) return '+255' + cleaned.substring(1);
+  if (cleaned.startsWith('0')) return countryCode + cleaned.substring(1);
+  if (cleaned.startsWith(countryCode.replace('+', ''))) return '+' + cleaned;
 
-  // If starts with 255 (Tanzania without +), add +
-  if (cleaned.startsWith('255')) return '+' + cleaned;
-
-  // Otherwise, fallback to +255
-  return '+255' + cleaned;
+  return countryCode + cleaned;
 }
 
-
 /**
- * 🔹 Send OTP via SMS using user ID.
+ * 🔹 Send OTP via Termii SMS using user ID
  * Fetches the phone number automatically from the database.
  *
  * @param {number} userId - User ID from the database
@@ -52,26 +41,31 @@ async function sendOTPSMS(userId, otp) {
       return { success: false, error: "No mobile number stored" };
     }
 
-    // Normalize number to +255 format
     const mobile = normalizeNumber(rows[0].mobile);
 
-    if (!mobile.startsWith('+')) {
-      throw new Error("Mobile number must be in E.164 format starting with +countrycode");
-    }
+    // Prepare Termii API payload
+    const payload = {
+      api_key: process.env.TERMII_API_KEY,
+      to: mobile,
+      from: process.env.TERMII_SENDER_ID || "Termii",
+      sms: `Your OTP is: ${otp}`,
+      type: "plain",
+      channel: "generic"
+    };
 
-    // Send SMS via Twilio
-    const message = await twilioClient.messages.create({
-      body: `Your OTP is: ${otp}`,
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to: mobile
-    });
+    // Send SMS via Termii
+    const response = await axios.post(
+      `${process.env.TERMII_BASE_URL}/api/sms/send`,
+      payload,
+      { headers: { "Content-Type": "application/json" } }
+    );
 
-    console.log(`📲 OTP sent to ${mobile}: ${otp} (SID: ${message.sid})`);
-    return { success: true };
+    console.log(`📲 OTP sent to ${mobile}: ${otp}`);
+    return { success: true, data: response.data };
 
   } catch (err) {
-    console.error("⚠️ SMS sending failed:", err.message);
-    return { success: false, error: err.message };
+    console.error("⚠️ SMS sending failed:", err.response?.data || err.message);
+    return { success: false, error: err.response?.data || err.message };
   }
 }
 
@@ -103,7 +97,7 @@ async function sendBulkEmail(emails, subject, content) {
   }
 }
 
-module.exports = {
+export {
   generateOTP,
   sendOTPSMS,
   sendBulkEmail,

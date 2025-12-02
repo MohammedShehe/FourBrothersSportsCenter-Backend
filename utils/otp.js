@@ -1,6 +1,7 @@
 // utils/otp.js
 const crypto = require('crypto');
 const dotenv = require('dotenv');
+const axios = require('axios');
 dotenv.config();
 
 const otpLength = parseInt(process.env.OTP_LENGTH || '6', 10);
@@ -14,37 +15,40 @@ function generateOTP() {
   return String(num).padStart(otpLength, '0');
 }
 
-// ---------------------- SEND OTP VIA PHONE ----------------------
+// ---------------------- NORMALIZE PHONE NUMBER ----------------------
+function normalizeNumber(phone, defaultCountryCode = '+255') {
+  let cleaned = phone.trim().replace(/[^0-9+]/g, '');
+  if (cleaned.startsWith('+')) return cleaned;
+  if (cleaned.startsWith('0')) return defaultCountryCode + cleaned.substring(1);
+  if (cleaned.startsWith(defaultCountryCode.replace('+', ''))) return '+' + cleaned;
+  return defaultCountryCode + cleaned;
+}
+
+// ---------------------- SEND OTP VIA PHONE (Termii) ----------------------
 async function sendOtpToNumber(phone, otp) {
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  const from = process.env.TWILIO_FROM_NUMBER;
+  const normalizedPhone = normalizeNumber(phone);
+  const payload = {
+    api_key: process.env.TERMII_API_KEY,
+    to: normalizedPhone,
+    from: process.env.TERMII_SENDER_ID || 'Termii',
+    sms: `Your Four Brothers Sports Center OTP is: ${otp}. It expires in ${otpExpireMinutes} minutes.`,
+    type: 'plain',
+    channel: 'generic'
+  };
 
-  if (sid && token && from) {
-    try {
-      const Twilio = require('twilio');
-      const client = Twilio(sid, token);
-      const msg = `Your Four Brothers Sports Center OTP is: ${otp}. It expires in ${otpExpireMinutes} minutes.`;
+  try {
+    const response = await axios.post(
+      `${process.env.TERMII_BASE_URL}/api/sms/send`,
+      payload,
+      { headers: { 'Content-Type': 'application/json' } }
+    );
 
-      const res = await client.messages.create({
-        body: msg,
-        from,
-        to: phone
-      });
-
-      console.log(`✅ OTP sent via Twilio -> phone: ${phone}, sid: ${res.sid}`);
-      return { success: true, sid: res.sid };
-    } catch (err) {
-      console.error('⚠️ Twilio send error, falling back to console log:', err.message);
-
-      // Fallback: log OTP for development
-      console.log(`🔑 DEV OTP -> phone: ${phone}, otp: ${otp} (expires in ${otpExpireMinutes} minutes)`);
-      return { success: true, debug: true, error: err.message };
-    }
-  } else {
-    // Twilio not configured: log the OTP for developer testing
-    console.log(`🔑 DEV OTP -> phone: ${phone}, otp: ${otp} (expires in ${otpExpireMinutes} minutes)`);
-    return { success: true, debug: true };
+    console.log(`✅ OTP sent via Termii -> phone: ${normalizedPhone}, response:`, response.data);
+    return { success: true, data: response.data };
+  } catch (err) {
+    console.error('⚠️ Termii send error, fallback to console log:', err.response?.data || err.message);
+    console.log(`🔑 DEV OTP -> phone: ${normalizedPhone}, otp: ${otp} (expires in ${otpExpireMinutes} minutes)`);
+    return { success: false, debug: true, error: err.response?.data || err.message };
   }
 }
 

@@ -1,7 +1,8 @@
+// utils/helpers.js
 const nodemailer = require('nodemailer');
-import axios from "axios"; // Use axios for Termii API
-import db from '../config/database';
-import 'dotenv/config';
+const axios = require('axios');
+const db = require('../config/database');
+require('dotenv').config();
 
 // 🔹 Generate 6-digit OTP
 function generateOTP() {
@@ -25,25 +26,30 @@ function normalizeNumber(phone, countryCode = '+255') {
  * 🔹 Send OTP via Termii SMS using user ID
  * Fetches the phone number automatically from the database.
  *
- * @param {number} userId - User ID from the database
+ * @param {number|string} userIdOrPhone - User ID or phone number
  * @param {string} otp - Generated OTP
  */
-async function sendOTPSMS(userId, otp) {
+async function sendOTPSMS(userIdOrPhone, otp) {
   try {
-    // Fetch mobile from DB
-    const [rows] = await db.query(
-      "SELECT mobile FROM users WHERE id=? LIMIT 1",
-      [userId]
-    );
+    let mobile = userIdOrPhone;
 
-    if (rows.length === 0 || !rows[0].mobile) {
-      console.warn("⚠️ No mobile number stored. Skipping SMS.");
-      return { success: false, error: "No mobile number stored" };
+    // If a number is not directly passed, fetch from DB using user ID
+    if (typeof userIdOrPhone === 'number') {
+      const [rows] = await db.query(
+        "SELECT mobile FROM users WHERE id=? LIMIT 1",
+        [userIdOrPhone]
+      );
+
+      if (!rows.length || !rows[0].mobile) {
+        console.warn("⚠️ No mobile number stored. Skipping SMS.");
+        return { success: false, error: "No mobile number stored" };
+      }
+
+      mobile = rows[0].mobile;
     }
 
-    const mobile = normalizeNumber(rows[0].mobile);
+    mobile = normalizeNumber(mobile);
 
-    // Prepare Termii API payload
     const payload = {
       api_key: process.env.TERMII_API_KEY,
       to: mobile,
@@ -53,7 +59,6 @@ async function sendOTPSMS(userId, otp) {
       channel: "generic"
     };
 
-    // Send SMS via Termii
     const response = await axios.post(
       `${process.env.TERMII_BASE_URL}/api/sms/send`,
       payload,
@@ -97,7 +102,7 @@ async function sendBulkEmail(emails, subject, content) {
   }
 }
 
-export {
+module.exports = {
   generateOTP,
   sendOTPSMS,
   sendBulkEmail,

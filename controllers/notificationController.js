@@ -1,8 +1,9 @@
 // controllers/notificationController.js
 
 const db = require('../config/database');
-const { sendBulkEmail, sendOTPSMS } = require('../utils/helpers');
+const { sendBulkEmail } = require('../utils/helpers');
 const cloudinary = require('../config/cloudinary');
+
 
 // ---------------- Ads Management ----------------
 exports.postAd = async (req, res) => {
@@ -178,7 +179,7 @@ exports.sendInAppMessageOnly = async (req, res) => {
 exports.getAllOrders = async (req, res) => {
   try {
     const [orders] = await db.query(`
-      SELECT o.id AS order_id, o.total_price, o.status, o.otp,
+      SELECT o.id AS order_id, o.total_price, o.status,
              c.first_name, c.last_name, c.phone,
              p.name AS product_name, oi.quantity
       FROM orders o
@@ -199,7 +200,10 @@ exports.updateOrderStatus = async (req, res) => {
     const { order_id } = req.params;
     const { status } = req.body;
 
-    if (!['Imewekwa', 'Inasafirishwa', 'Ghairishwa', 'Kurudishwa'].includes(status)) {
+    // Allowed statuses without OTP confirmation
+    const allowedStatuses = ['Imewekwa', 'Inasafirishwa', 'Ghairishwa', 'Kurudishwa'];
+    
+    if (!allowedStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
 
@@ -210,88 +214,6 @@ exports.updateOrderStatus = async (req, res) => {
     res.json({ message: "Order status updated successfully" });
   } catch (err) {
     console.error("Update Order Status Error:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-exports.generateOrderOtp = async (req, res) => {
-  try {
-    const { order_id } = req.params;
-
-    const [orders] = await db.query(
-      `SELECT o.id, o.customer_id, o.status, c.phone
-       FROM orders o
-       JOIN customers c ON o.customer_id = c.id
-       WHERE o.id=?`,
-      [order_id]
-    );
-
-    if (orders.length === 0) return res.status(404).json({ message: "Order not found" });
-
-    const order = orders[0];
-
-    if (order.status !== 'Inasafirishwa') {
-      return res.status(400).json({ message: "Order is not ready to be marked as received" });
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    await db.query("UPDATE orders SET otp=?, status='Imepokelewa_PENDING' WHERE id=?", [otp, order_id]);
-
-    const { normalizeNumber } = require('../utils/helpers');
-    const normalizedPhone = normalizeNumber(order.phone);
-
-    try {
-      await sendOTPSMS(normalizedPhone, `Your OTP to confirm order ${order_id} is: ${otp}`);
-    } catch (smsErr) {
-      console.error(`Failed to send OTP SMS for order ${order_id}:`, smsErr.message);
-    }
-
-    res.json({ message: "OTP generated", otp });
-
-  } catch (err) {
-    console.error("Generate OTP Error:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-exports.confirmOrderReception = async (req, res) => {
-  try {
-    const { order_id } = req.params;
-    const { otp } = req.body;
-
-    const [orders] = await db.query("SELECT otp, status FROM orders WHERE id=?", [order_id]);
-    if (!orders.length) return res.status(404).json({ message: "Order not found" });
-
-    const order = orders[0];
-
-    if (order.status !== 'Imepokelewa_PENDING') {
-      return res.status(400).json({ message: "Order is not ready for OTP confirmation" });
-    }
-
-    if (order.otp !== otp) return res.status(400).json({ message: "Invalid OTP" });
-
-    await db.query("UPDATE orders SET otp=NULL, status='Imepokelewa' WHERE id=?", [order_id]);
-
-    res.json({ message: "Order reception confirmed successfully" });
-
-  } catch (err) {
-    console.error("Confirm Order OTP Error:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-exports.getOrderOtp = async (req, res) => {
-  try {
-    const { order_id } = req.params;
-    const [rows] = await db.query("SELECT otp FROM orders WHERE id=?", [order_id]);
-
-    if (!rows.length) return res.status(404).json({ message: "Order not found" });
-
-    res.json({ otp: rows[0].otp });
-
-  } catch (err) {
-    console.error("Get OTP Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

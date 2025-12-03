@@ -36,8 +36,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Server error', error: err.message });
 });
 
-// ----------------- Background Tasks -----------------
-require('./utils/otpCleaner');
+
 
 // ----------------- Start Server -----------------
 const PORT = process.env.PORT || 5000;

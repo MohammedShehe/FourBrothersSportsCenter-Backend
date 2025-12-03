@@ -11,8 +11,16 @@ const customerController = require('../controllers/customerController');
 const notificationController = require('../controllers/notificationController');
 
 // ---------------- Authentication ----------------
-router.post('/login', adminController.login);
-router.post('/verify-otp', adminController.verifyOtp);
+router.post('/login', adminController.adminLogin); // Changed to adminLogin
+router.post('/forgot-password', adminController.forgotPassword);
+router.post('/reset-password', adminController.resetPassword);
+router.post('/change-mobile', adminController.changeMobile);
+
+// ---------------- Admin Management (Only by main admin) ----------------
+router.post('/admins', adminAuth, adminController.addAdmin);
+router.get('/admins', adminAuth, adminController.getAdmins);
+router.put('/admins/:id', adminAuth, adminController.updateAdmin);
+router.delete('/admins/:id', adminAuth, adminController.deleteAdmin);
 
 // ---------------- Dashboard ----------------
 router.get('/dashboard/stats', adminAuth, dashboardController.getDashboardStats);
@@ -41,13 +49,7 @@ router.post('/messages', adminAuth, notificationController.sendInAppMessageOnly)
 
 // ---------------- Orders ----------------
 router.get('/orders', adminAuth, notificationController.getAllOrders);
-
-// ✅ Normal status updates (except Imepokelewa)
 router.put('/orders/:order_id/status', adminAuth, notificationController.updateOrderStatus);
-
-// ✅ OTP flow for Imepokelewa
-router.get('/orders/:order_id/otp', adminAuth, notificationController.getOrderOtp);       // optional for logging/testing
-router.post('/orders/:order_id/generate-otp', adminAuth, notificationController.generateOrderOtp); // new: generate OTP & set Imepokelewa_PENDING
-router.post('/orders/:order_id/confirm', adminAuth, notificationController.confirmOrderReception); // confirm OTP and finalize status
+// OTP routes removed - password confirmation handled on customer side
 
 module.exports = router;

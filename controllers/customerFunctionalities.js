@@ -1,14 +1,7 @@
-// controllers/customerController.js
 const pool = require('../config/database');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken'); // ADD THIS IMPORT
 const { body, validationResult } = require('express-validator');
-const {
-  generateOTP,
-  sendOtpToNumber,
-  sendOtpToEmail,
-  otpExpireMinutes
-} = require('../utils/otp');
-
-const { normalizeNumber, sendOTPSMS } = require('../utils/helpers');
 const {
   generateAccessToken,
   generateRefreshToken,
@@ -22,6 +15,13 @@ const registerValidators = [
   body('first_name').trim().notEmpty().withMessage('First name is required'),
   body('last_name').trim().notEmpty().withMessage('Last name is required'),
   body('phone').trim().notEmpty().withMessage('Phone is required'),
+  body('password').trim().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('confirm_password').custom((value, { req }) => {
+    if (value !== req.body.password) {
+      throw new Error('Passwords do not match');
+    }
+    return true;
+  }),
   body('gender')
     .trim()
     .isIn(['mwanaume', 'mwanamke', 'nyengine'])
@@ -35,15 +35,18 @@ async function registerCustomer(req, res) {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { first_name, last_name, phone, email, address, gender } = req.body;
+    const { first_name, last_name, phone, email, address, gender, password } = req.body;
 
     const [existing] = await pool.execute('SELECT id FROM customers WHERE phone = ?', [phone]);
     if (existing.length > 0) return res.status(409).json({ message: 'Phone already registered' });
 
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const [result] = await pool.execute(
-      `INSERT INTO customers (first_name, last_name, phone, email, address, gender)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [first_name, last_name, phone, email || null, address || null, gender]
+      `INSERT INTO customers (first_name, last_name, phone, email, address, gender, password)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [first_name, last_name, phone, email || null, address || null, gender, hashedPassword]
     );
 
     const [rows] = await pool.execute(
@@ -51,109 +54,287 @@ async function registerCustomer(req, res) {
       [result.insertId]
     );
 
-    return res.status(201).json({ message: 'Customer registered', customer: rows[0] });
+    return res.status(201).json({ message: 'Customer registered successfully', customer: rows[0] });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Server error' });
   }
 }
 
-// ---------------------- SEND OTP ----------------------
-async function sendOtp(req, res) {
+// ---------------------- LOGIN CUSTOMER ----------------------
+async function loginCustomer(req, res) {
   try {
-    const { phone } = req.body;
-    if (!phone) return res.status(400).json({ message: 'Phone is required' });
+    const { phone, password } = req.body;
 
-    // Normalize to +255 format
-    const normalizedPhone = normalizeNumber(phone);
-
-    // Check customer exists (match against raw phone stored in DB)
-    const [custRows] = await pool.execute('SELECT id FROM customers WHERE phone = ?', [phone]);
-    if (custRows.length === 0) {
-      return res.status(404).json({ message: 'Phone not registered.' });
+    if (!phone || !password) {
+      return res.status(400).json({ message: 'Phone and password are required' });
     }
 
-    const customerId = custRows[0].id;
-
-    // Invalidate previous OTPs
-    await pool.execute("UPDATE customer_otps SET used=1 WHERE customer_id=? AND used=0", [customerId]);
-
-    // Generate new OTP
-    const otp = generateOTP();
-
-    // Save OTP with normalized phone
-    await pool.execute(
-      `INSERT INTO customer_otps (customer_id, phone, otp, expires_at, used) 
-       VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), 0)`,
-      [customerId, normalizedPhone, otp, otpExpireMinutes]
-    );
-
-    // Send OTP via Twilio
-    const sendRes = await sendOTPSMS(normalizedPhone, otp);
-    if (!sendRes.success) {
-      return res.status(500).json({ message: 'Failed to send OTP', error: sendRes.error });
-    }
-
-    return res.status(200).json({ message: 'OTP sent. It expires shortly.' });
-  } catch (err) {
-    console.error("Customer Send OTP Error:", err);
-    return res.status(500).json({ message: 'Server error' });
-  }
-}
-
-// ---------------------- VERIFY OTP ----------------------
-async function verifyOtp(req, res) {
-  try {
-    const { phone, otp } = req.body;
-    if (!phone || !otp) return res.status(400).json({ message: 'Phone and otp required' });
-
-    const [rows] = await pool.execute(
-      `SELECT * FROM customer_otps WHERE phone = ? AND used = 0 AND expires_at >= NOW() ORDER BY created_at DESC LIMIT 1`,
-      [phone]
-    );
-    if (rows.length === 0) return res.status(400).json({ message: 'No valid OTP found or it expired' });
-
-    const record = rows[0];
-    if (record.otp !== String(otp).trim()) return res.status(400).json({ message: 'Invalid OTP' });
-
-    await pool.execute('UPDATE customer_otps SET used = 1 WHERE id = ?', [record.id]);
-
+    // Check customer exists
     const [custRows] = await pool.execute(
-      'SELECT id, first_name, last_name, phone, email, address, gender FROM customers WHERE phone = ?',
+      'SELECT * FROM customers WHERE phone = ?',
       [phone]
     );
-    if (custRows.length === 0) return res.status(404).json({ message: 'Customer not found' });
+    if (custRows.length === 0) {
+      return res.status(404).json({ message: 'Customer not found' });
+    }
 
     const customer = custRows[0];
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, customer.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid password' });
+    }
 
     const accessToken = generateAccessToken({ id: customer.id, phone: customer.phone });
     const refreshToken = generateRefreshToken({ id: customer.id, phone: customer.phone });
 
-    return res.status(200).json({ message: 'OTP verified', accessToken, refreshToken, customer });
+    return res.status(200).json({ 
+      message: 'Login successful', 
+      accessToken, 
+      refreshToken, 
+      customer: {
+        id: customer.id,
+        first_name: customer.first_name,
+        last_name: customer.last_name,
+        phone: customer.phone,
+        email: customer.email,
+        address: customer.address,
+        gender: customer.gender
+      }
+    });
   } catch (err) {
-    console.error(err);
+    console.error("Customer Login Error:", err);
     return res.status(500).json({ message: 'Server error' });
   }
 }
 
-// ---------------------- REFRESH TOKEN ----------------------
-async function refreshToken(req, res) {
+// ---------------------- REQUEST PASSWORD RESET ----------------------
+async function requestPasswordReset(req, res) {
   try {
-    const { refreshToken: token } = req.body;
-    if (!token) return res.status(401).json({ message: 'No refresh token provided' });
+    const { first_name, last_name } = req.body;
 
-    const decoded = verifyRefreshToken(token);
-    if (!decoded) return res.status(401).json({ message: 'Invalid or expired refresh token' });
+    if (!first_name || !last_name) {
+      return res.status(400).json({ message: 'First name and last name are required' });
+    }
 
-    const newAccessToken = generateAccessToken({ id: decoded.id, phone: decoded.phone });
-    return res.json({ accessToken: newAccessToken });
+    const [custRows] = await pool.execute(
+      'SELECT * FROM customers WHERE first_name = ? AND last_name = ?',
+      [first_name, last_name]
+    );
+
+    if (custRows.length === 0) {
+      return res.status(404).json({ message: 'Customer not found with these details' });
+    }
+
+    const customer = custRows[0];
+
+    // Generate reset token (simple JWT)
+    const resetToken = jwt.sign(
+      { id: customer.id, type: 'password_reset' },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // Save reset token to database
+    await pool.execute(
+      'UPDATE customers SET reset_token=?, reset_token_expires=DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id=?',
+      [resetToken, customer.id]
+    );
+
+    return res.json({ 
+      message: 'Password reset authorized', 
+      reset_token: resetToken,
+      next_step: 'Use this token to reset your password' 
+    });
   } catch (err) {
-    console.error(err);
+    console.error("Request Password Reset Error:", err);
     return res.status(500).json({ message: 'Server error' });
   }
 }
 
-// ---------------------- GET CUSTOMER PROFILE ----------------------
+// ---------------------- RESET PASSWORD ----------------------
+async function resetPassword(req, res) {
+  try {
+    const { reset_token, new_password, confirm_password } = req.body;
+
+    if (!reset_token || !new_password || !confirm_password) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    if (new_password !== confirm_password) {
+      return res.status(400).json({ message: 'Passwords do not match' });
+    }
+
+    // Verify reset token and check expiration
+    const [custRows] = await pool.execute(
+      'SELECT * FROM customers WHERE reset_token=? AND reset_token_expires > NOW()',
+      [reset_token]
+    );
+
+    if (custRows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+
+    const customer = custRows[0];
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(new_password, 10);
+
+    // Update password and clear reset token
+    await pool.execute(
+      'UPDATE customers SET password=?, reset_token=NULL, reset_token_expires=NULL WHERE id=?',
+      [hashedPassword, customer.id]
+    );
+
+    return res.json({ message: 'Password reset successful. You can now login with your new password.' });
+  } catch (err) {
+    console.error("Reset Password Error:", err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// ---------------------- CHANGE MOBILE NUMBER ----------------------
+async function changeMobile(req, res) {
+  try {
+    const { first_name, last_name, new_mobile, confirm_mobile } = req.body;
+
+    if (!first_name || !last_name || !new_mobile || !confirm_mobile) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    if (new_mobile !== confirm_mobile) {
+      return res.status(400).json({ message: 'Mobile numbers do not match' });
+    }
+
+    const [custRows] = await pool.execute(
+      'SELECT * FROM customers WHERE first_name = ? AND last_name = ?',
+      [first_name, last_name]
+    );
+
+    if (custRows.length === 0) {
+      return res.status(404).json({ message: 'Customer not found with these details' });
+    }
+
+    const customer = custRows[0];
+
+    // Check if new mobile is already taken
+    const [existing] = await pool.execute(
+      'SELECT id FROM customers WHERE phone=? AND id!=?',
+      [new_mobile, customer.id]
+    );
+
+    if (existing.length > 0) {
+      return res.status(400).json({ message: 'Mobile number already in use' });
+    }
+
+    // Update mobile number
+    await pool.execute(
+      'UPDATE customers SET phone=? WHERE id=?',
+      [new_mobile, customer.id]
+    );
+
+    return res.json({ message: 'Mobile number updated successfully. You can now login with your new mobile number.' });
+  } catch (err) {
+    console.error("Change Mobile Error:", err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// ---------------------- VERIFY PASSWORD FOR ORDER CONFIRMATION ----------------------
+async function verifyPasswordForOrder(req, res) {
+  try {
+    const customerId = req.user.id;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required' });
+    }
+
+    // Get customer
+    const [custRows] = await pool.execute(
+      'SELECT password FROM customers WHERE id = ?',
+      [customerId]
+    );
+
+    if (custRows.length === 0) {
+      return res.status(404).json({ message: 'Customer not found' });
+    }
+
+    const customer = custRows[0];
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, customer.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid password' });
+    }
+
+    return res.json({ message: 'Password verified successfully' });
+  } catch (err) {
+    console.error("Verify Password Error:", err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// ---------------------- UPDATE ORDER STATUS WITH PASSWORD VERIFICATION ----------------------
+async function confirmOrderReception(req, res) {
+  try {
+    const { order_id } = req.params;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ message: "Password is required to confirm order reception" });
+    }
+
+    const customerId = req.user.id;
+
+    // Verify customer password
+    const [custRows] = await pool.execute(
+      'SELECT password FROM customers WHERE id = ?',
+      [customerId]
+    );
+
+    if (custRows.length === 0) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    const customer = custRows[0];
+    const isPasswordValid = await bcrypt.compare(password, customer.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid password" });
+    }
+
+    // Check order status
+    const [orders] = await pool.execute(
+      "SELECT status FROM orders WHERE id=? AND customer_id=?",
+      [order_id, customerId]
+    );
+
+    if (orders.length === 0) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const order = orders[0];
+
+    if (order.status !== 'Inasafirishwa') {
+      return res.status(400).json({ message: "Order is not ready to be marked as received" });
+    }
+
+    // Update order status to received
+    await pool.execute(
+      "UPDATE orders SET status='Imepokelewa' WHERE id=?",
+      [order_id]
+    );
+
+    return res.json({ message: "Order reception confirmed successfully" });
+  } catch (err) {
+    console.error("Confirm Order Reception Error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
+
 async function getCustomerProfile(req, res) {
   try {
     const id = req.user.id;
@@ -169,22 +350,42 @@ async function getCustomerProfile(req, res) {
   }
 }
 
-// ---------------------- UPDATE PROFILE ----------------------
 async function updateProfile(req, res) {
   try {
     const id = req.user.id;
-    const { first_name, last_name, address, gender, new_phone, new_email } = req.body;
+    const { first_name, last_name, address, gender, new_phone, new_email, current_password } = req.body;
 
     const [custRows] = await pool.execute('SELECT * FROM customers WHERE id = ?', [id]);
     if (custRows.length === 0) return res.status(404).json({ message: 'Customer not found' });
 
     const customer = custRows[0];
 
-    if (new_phone && new_phone !== customer.phone)
-      return res.status(403).json({ message: 'Phone change requires OTP verification' });
-    if (new_email && new_email !== customer.email)
-      return res.status(403).json({ message: 'Email change requires OTP verification' });
+    // Verify current password for sensitive changes
+    if (new_phone || new_email) {
+      if (!current_password) {
+        return res.status(400).json({ message: 'Current password is required for this change' });
+      }
+      
+      const isPasswordValid = await bcrypt.compare(current_password, customer.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: 'Invalid current password' });
+      }
+    }
 
+    if (new_phone && new_phone !== customer.phone) {
+      // Check if new phone is already taken
+      const [existing] = await pool.execute('SELECT id FROM customers WHERE phone = ? AND id != ?', [new_phone, id]);
+      if (existing.length > 0) {
+        return res.status(400).json({ message: 'Phone number already in use' });
+      }
+      await pool.execute('UPDATE customers SET phone = ? WHERE id = ?', [new_phone, id]);
+    }
+
+    if (new_email && new_email !== customer.email) {
+      await pool.execute('UPDATE customers SET email = ? WHERE id = ?', [new_email, id]);
+    }
+
+    // Update basic info
     await pool.execute(
       `UPDATE customers SET first_name=?, last_name=?, address=?, gender=? WHERE id=?`,
       [
@@ -208,68 +409,114 @@ async function updateProfile(req, res) {
   }
 }
 
-// ---------------------- REQUEST CHANGE OTP ----------------------
-async function requestChangeOtp(req, res) {
+// Remove OTP-related functions and replace with password verification
+async function changeEmail(req, res) {
   try {
     const id = req.user.id;
-    const { type } = req.body; // 'phone' or 'email'
+    const { new_email, current_password } = req.body;
+
+    if (!new_email || !current_password) {
+      return res.status(400).json({ message: 'New email and current password are required' });
+    }
 
     const [custRows] = await pool.execute('SELECT * FROM customers WHERE id = ?', [id]);
     if (custRows.length === 0) return res.status(404).json({ message: 'Customer not found' });
+
     const customer = custRows[0];
 
-    const otp = generateOTP();
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(current_password, customer.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid current password' });
+    }
 
-    if (type === 'phone') {
-      await pool.execute(
-        `INSERT INTO customer_otps (customer_id, phone, otp, expires_at, used) 
-         VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), 0)`,
-        [id, customer.phone, otp, otpExpireMinutes]
-      );
-      await sendOtpToNumber(customer.phone, otp);
-    } else if (type === 'email') {
-      await sendOtpToEmail(customer.email, otp);
-    } else return res.status(400).json({ message: 'Invalid type. Use phone or email' });
+    // Update email
+    await pool.execute('UPDATE customers SET email = ? WHERE id = ?', [new_email, id]);
 
-    return res.json({ message: `OTP sent to your current ${type}` });
+    const [updated] = await pool.execute(
+      'SELECT id, first_name, last_name, phone, email, address, gender FROM customers WHERE id = ?',
+      [id]
+    );
+
+    return res.json({ message: 'Email updated successfully', customer: updated[0] });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Server error' });
   }
 }
 
-// ---------------------- CONFIRM CHANGE ----------------------
-async function confirmChange(req, res) {
+async function changePhone(req, res) {
   try {
     const id = req.user.id;
-    const { otp, new_phone, new_email } = req.body;
+    const { new_phone, current_password } = req.body;
+
+    if (!new_phone || !current_password) {
+      return res.status(400).json({ message: 'New phone and current password are required' });
+    }
 
     const [custRows] = await pool.execute('SELECT * FROM customers WHERE id = ?', [id]);
     if (custRows.length === 0) return res.status(404).json({ message: 'Customer not found' });
 
     const customer = custRows[0];
 
-    if (new_phone) {
-      const [rows] = await pool.execute(
-        `SELECT * FROM customer_otps WHERE phone = ? AND used = 0 AND expires_at >= NOW() ORDER BY created_at DESC LIMIT 1`,
-        [customer.phone]
-      );
-      if (rows.length === 0 || rows[0].otp !== String(otp).trim())
-        return res.status(400).json({ message: 'Invalid or expired OTP' });
-
-      await pool.execute('UPDATE customer_otps SET used = 1 WHERE id=?', [rows[0].id]);
-      await pool.execute('UPDATE customers SET phone=? WHERE id=?', [new_phone, id]);
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(current_password, customer.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid current password' });
     }
 
-    if (new_email) {
-      await pool.execute('UPDATE customers SET email=? WHERE id=?', [new_email, id]);
+    // Check if new phone is already taken
+    const [existing] = await pool.execute('SELECT id FROM customers WHERE phone = ? AND id != ?', [new_phone, id]);
+    if (existing.length > 0) {
+      return res.status(400).json({ message: 'Phone number already in use' });
     }
+
+    // Update phone
+    await pool.execute('UPDATE customers SET phone = ? WHERE id = ?', [new_phone, id]);
 
     const [updated] = await pool.execute(
-      'SELECT id, first_name, last_name, phone, email, address, gender FROM customers WHERE id=?',
+      'SELECT id, first_name, last_name, phone, email, address, gender FROM customers WHERE id = ?',
       [id]
     );
-    return res.json({ message: 'Profile updated', customer: updated[0] });
+
+    return res.json({ message: 'Phone number updated successfully', customer: updated[0] });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function changePassword(req, res) {
+  try {
+    const id = req.user.id;
+    const { current_password, new_password, confirm_password } = req.body;
+
+    if (!current_password || !new_password || !confirm_password) {
+      return res.status(400).json({ message: 'All password fields are required' });
+    }
+
+    if (new_password !== confirm_password) {
+      return res.status(400).json({ message: 'New passwords do not match' });
+    }
+
+    const [custRows] = await pool.execute('SELECT * FROM customers WHERE id = ?', [id]);
+    if (custRows.length === 0) return res.status(404).json({ message: 'Customer not found' });
+
+    const customer = custRows[0];
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(current_password, customer.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid current password' });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(new_password, 10);
+
+    // Update password
+    await pool.execute('UPDATE customers SET password = ? WHERE id = ?', [hashedPassword, id]);
+
+    return res.json({ message: 'Password changed successfully' });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Server error' });
@@ -595,18 +842,38 @@ async function sendCustomerMessage(req, res) {
     return res.status(500).json({ message: 'Server error' });
   }
 }
+// ---------------------- REFRESH TOKEN ----------------------
+async function refreshToken(req, res) {
+  try {
+    const { refreshToken: token } = req.body;
+    if (!token) return res.status(401).json({ message: 'No refresh token provided' });
+
+    const decoded = verifyRefreshToken(token);
+    if (!decoded) return res.status(401).json({ message: 'Invalid or expired refresh token' });
+
+    const newAccessToken = generateAccessToken({ id: decoded.id, phone: decoded.phone });
+    return res.json({ accessToken: newAccessToken });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
 
 
 module.exports = {
   registerValidators,
   registerCustomer,
-  sendOtp,
-  verifyOtp,
-  refreshToken,
+  loginCustomer,
+  requestPasswordReset,
+  resetPassword,
+  changeMobile,
+  verifyPasswordForOrder,
+  confirmOrderReception,
   getCustomerProfile,
   updateProfile,
-  requestChangeOtp,
-  confirmChange,
+  changeEmail,
+  changePhone,
+  changePassword,
   getAds,
   getAnnouncements,
   getAllProducts,
@@ -617,5 +884,6 @@ module.exports = {
   returnOrder,
   rateOrder,
   getProductRatings,
-  sendCustomerMessage
+  sendCustomerMessage,
+  refreshToken
 };

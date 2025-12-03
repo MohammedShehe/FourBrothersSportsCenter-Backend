@@ -1,17 +1,20 @@
-// routes/customerRoutes.js
 const express = require('express');
 const router = express.Router();
 
 const {
   registerValidators,
   registerCustomer,
-  sendOtp,
-  verifyOtp,
-  refreshToken,
+  loginCustomer,
+  requestPasswordReset,
+  resetPassword,
+  changeMobile,
+  verifyPasswordForOrder,
+  confirmOrderReception,
   getCustomerProfile,
   updateProfile,
-  requestChangeOtp,
-  confirmChange,
+  changeEmail,
+  changePhone,
+  changePassword,
   getAds,
   getAnnouncements,
   getAllProducts,
@@ -22,7 +25,8 @@ const {
   returnOrder,
   rateOrder,
   getProductRatings,
-  sendCustomerMessage
+  sendCustomerMessage,
+  refreshToken // Add this import
 } = require('../controllers/customerFunctionalities');
 
 const { authMiddleware } = require('../middleware/customerAuth');
@@ -31,27 +35,32 @@ const { authMiddleware } = require('../middleware/customerAuth');
 // Register new customer
 router.post('/register', [...registerValidators], registerCustomer);
 
-// Send OTP for login
-router.post('/send-otp', sendOtp);
+// Login customer
+router.post('/login', loginCustomer);
 
-// Verify OTP + return access & refresh token
-router.post('/verify-otp', verifyOtp);
+// Refresh token
+router.post('/refresh-token', refreshToken); // Add this route
 
-// Refresh access token
-router.post('/refresh-token', refreshToken);
+// Password reset flow
+router.post('/forgot-password', requestPasswordReset);
+router.post('/reset-password', resetPassword);
+router.post('/change-mobile', changeMobile);
 
 // ------------------- PROFILE -------------------
 // Get profile (JWT required)
 router.get('/me', authMiddleware, getCustomerProfile);
 
-// Update profile (basic info only)
+// Update profile
 router.put('/me/update', authMiddleware, updateProfile);
 
-// Request OTP for phone/email change
-router.post('/me/request-change-otp', authMiddleware, requestChangeOtp);
+// Change email (requires current password)
+router.post('/me/change-email', authMiddleware, changeEmail);
 
-// Confirm phone/email change with OTP
-router.post('/me/confirm-change', authMiddleware, confirmChange);
+// Change phone (requires current password)
+router.post('/me/change-phone', authMiddleware, changePhone);
+
+// Change password (requires current password)
+router.post('/me/change-password', authMiddleware, changePassword);
 
 // ------------------- CUSTOMER CONTENT -------------------
 // Get ads (public: no auth required)
@@ -66,6 +75,7 @@ router.get('/products', getAllProducts);
 // Get single product by ID (optional, public)
 router.get('/products/:id', getProductById);
 
+// Send message to admin
 router.post('/send-message', authMiddleware, sendCustomerMessage);
 
 // ------------------- ORDERS -------------------
@@ -84,6 +94,13 @@ router.post('/orders/:order_id/return', authMiddleware, returnOrder);
 // Rate an order (status 'Imepokelewa')
 router.post('/orders/:order_id/rate', authMiddleware, rateOrder);
 
+// Verify password for order confirmation
+router.post('/verify-password', authMiddleware, verifyPasswordForOrder);
+
+// Confirm order reception with password (replaces OTP confirmation)
+router.post('/orders/:order_id/confirm', authMiddleware, confirmOrderReception);
+
 // View customer ratings
 router.get('/ratings', authMiddleware, getProductRatings);
+
 module.exports = router;

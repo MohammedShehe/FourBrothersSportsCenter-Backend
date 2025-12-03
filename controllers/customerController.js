@@ -10,22 +10,22 @@ exports.addCustomer = async (req, res) => {
     const { first_name, last_name, phone, email, gender, password, confirm_password } = req.body;
 
     if (!first_name || !last_name || !phone || !gender || !password || !confirm_password) {
-      return res.status(400).json({ message: "Please provide all required fields" });
+      return res.status(400).json({ message: "Tafadhali jaza taarifa zote muhimu" });
     }
 
     if (password !== confirm_password) {
-      return res.status(400).json({ message: "Passwords do not match" });
+      return res.status(400).json({ message: "Nenosiri halifanani" });
     }
 
     // Check gender validity
     const validGenders = ["mwanaume", "mwanamke", "nyengine"];
     if (!validGenders.includes(gender.toLowerCase())) {
-      return res.status(400).json({ message: "Invalid gender provided" });
+      return res.status(400).json({ message: "Jinsia uliyoingiza si sahihi" });
     }
 
     const [existing] = await db.query("SELECT id FROM customers WHERE phone = ?", [phone]);
     if (existing.length > 0) {
-      return res.status(400).json({ message: "Customer with this phone already exists" });
+      return res.status(400).json({ message: "Mteja mwenye nambari hii tayari yupo" });
     }
 
     // Hash password
@@ -36,10 +36,10 @@ exports.addCustomer = async (req, res) => {
       [first_name, last_name, phone, email || null, gender, hashedPassword]
     );
 
-    res.status(201).json({ message: "Customer added successfully" });
+    res.status(201).json({ message: "Mteja ameongezwa kwa mafanikio" });
   } catch (err) {
     console.error("Add Customer Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -49,43 +49,40 @@ exports.forgotPassword = async (req, res) => {
     const { first_name, last_name } = req.body;
 
     if (!first_name || !last_name) {
-      return res.status(400).json({ message: "First name and last name are required" });
+      return res.status(400).json({ message: "Jina la kwanza na la mwisho yanahitajika" });
     }
 
-    // Check if customer exists
     const [rows] = await db.query(
       "SELECT * FROM customers WHERE first_name=? AND last_name=? LIMIT 1",
       [first_name, last_name]
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: "Customer not found with these details" });
+      return res.status(404).json({ message: "Hakuna mteja aliyetambuliwa kwa taarifa hizi" });
     }
 
     const customer = rows[0];
 
-    // Generate reset token
     const resetToken = jwt.sign(
       { id: customer.id, type: 'password_reset' },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    // Save reset token to database
     await db.query(
       "UPDATE customers SET reset_token=?, reset_token_expires=DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id=?",
       [resetToken, customer.id]
     );
 
     res.json({
-      message: "Password reset authorized",
+      message: "Uthibitisho wa kubadili nenosiri umetolewa",
       reset_token: resetToken,
-      next_step: "Use this token to reset your password"
+      next_step: "Tumia token hii kuweka upya nenosiri lako"
     });
 
   } catch (err) {
     console.error("Customer Forgot Password Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -95,39 +92,36 @@ exports.resetPassword = async (req, res) => {
     const { reset_token, new_password, confirm_password } = req.body;
 
     if (!reset_token || !new_password || !confirm_password) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res.status(400).json({ message: "Tafadhali jaza taarifa zote muhimu" });
     }
 
     if (new_password !== confirm_password) {
-      return res.status(400).json({ message: "Passwords do not match" });
+      return res.status(400).json({ message: "Nenosiri halifanani" });
     }
 
-    // Verify reset token and check expiration
     const [customerRows] = await db.query(
       "SELECT * FROM customers WHERE reset_token=? AND reset_token_expires > NOW() LIMIT 1",
       [reset_token]
     );
 
     if (customerRows.length === 0) {
-      return res.status(400).json({ message: "Invalid or expired reset token" });
+      return res.status(400).json({ message: "Token ya kubadili nenosiri si sahihi au imekwisha muda" });
     }
 
     const customer = customerRows[0];
 
-    // Hash new password
     const hashedPassword = await bcrypt.hash(new_password, 10);
 
-    // Update password and clear reset token
     await db.query(
       "UPDATE customers SET password=?, reset_token=NULL, reset_token_expires=NULL WHERE id=?",
       [hashedPassword, customer.id]
     );
 
-    res.json({ message: "Password reset successful. You can now login with your new password." });
+    res.json({ message: "Nenosiri limebadilishwa kwa mafanikio. Sasa unaweza kuingia tena." });
 
   } catch (err) {
     console.error("Reset Customer Password Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -137,57 +131,54 @@ exports.changeMobile = async (req, res) => {
     const { first_name, last_name, new_mobile, confirm_mobile } = req.body;
 
     if (!first_name || !last_name || !new_mobile || !confirm_mobile) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res.status(400).json({ message: "Tafadhali jaza taarifa zote muhimu" });
     }
 
     if (new_mobile !== confirm_mobile) {
-      return res.status(400).json({ message: "Mobile numbers do not match" });
+      return res.status(400).json({ message: "Nambari za simu hazifanani" });
     }
 
-    // Check if customer exists
     const [rows] = await db.query(
       "SELECT * FROM customers WHERE first_name=? AND last_name=? LIMIT 1",
       [first_name, last_name]
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: "Customer not found with these details" });
+      return res.status(404).json({ message: "Hakuna mteja aliyetambuliwa kwa taarifa hizi" });
     }
 
     const customer = rows[0];
 
-    // Check if new mobile is already taken
     const [existing] = await db.query(
       "SELECT id FROM customers WHERE phone=? AND id!=?",
       [new_mobile, customer.id]
     );
 
     if (existing.length > 0) {
-      return res.status(400).json({ message: "Mobile number already in use" });
+      return res.status(400).json({ message: "Nambari hii ya simu tayari imesajiliwa" });
     }
 
-    // Update mobile number
     await db.query(
       "UPDATE customers SET phone=? WHERE id=?",
       [new_mobile, customer.id]
     );
 
-    res.json({ message: "Mobile number updated successfully. You can now login with your new mobile number." });
+    res.json({ message: "Nambari ya simu imebadilishwa kwa mafanikio. Sasa unaweza kuingia kwa kutumia nambari mpya." });
 
   } catch (err) {
     console.error("Change Customer Mobile Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
-// Other customer controller functions remain the same...
+// ---------------------- GET CUSTOMERS ----------------------
 exports.getCustomers = async (req, res) => {
   try {
     const [rows] = await db.query("SELECT id, first_name, last_name, phone, email, gender, created_at FROM customers ORDER BY created_at DESC");
     res.json(rows);
   } catch (err) {
     console.error("Get Customers Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -198,7 +189,7 @@ exports.updateCustomer = async (req, res) => {
 
     const [customer] = await db.query("SELECT * FROM customers WHERE id = ?", [id]);
     if (customer.length === 0) {
-      return res.status(404).json({ message: "Customer not found" });
+      return res.status(404).json({ message: "Mteja hakupatikana" });
     }
 
     await db.query(
@@ -206,43 +197,47 @@ exports.updateCustomer = async (req, res) => {
       [first_name, last_name, phone, email || null, gender, id]
     );
 
-    res.json({ message: "Customer updated successfully" });
+    res.json({ message: "Taarifa za mteja zimesasishwa kwa mafanikio" });
   } catch (err) {
     console.error("Update Customer Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
 exports.deleteCustomer = async (req, res) => {
   try {
     const { id } = req.params;
+
     const [customer] = await db.query("SELECT * FROM customers WHERE id = ?", [id]);
     if (customer.length === 0) {
-      return res.status(404).json({ message: "Customer not found" });
+      return res.status(404).json({ message: "Mteja hakupatikana" });
     }
 
     await db.query("DELETE FROM customers WHERE id = ?", [id]);
-    res.json({ message: "Customer deleted successfully" });
+    res.json({ message: "Mteja ameondolewa kwa mafanikio" });
+
   } catch (err) {
     console.error("Delete Customer Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
-// ---------------------- REFRESH TOKEN FUNCTION ----------------------
+// ---------------------- REFRESH TOKEN ----------------------
 exports.refreshToken = async (req, res) => {
   try {
     const { refreshToken: token } = req.body;
-    if (!token) return res.status(401).json({ message: 'No refresh token provided' });
+    if (!token) return res.status(401).json({ message: 'Hakuna refresh token iliyowasilishwa' });
 
     const { verifyRefreshToken, generateAccessToken } = require('../middleware/customerAuth');
     const decoded = verifyRefreshToken(token);
-    if (!decoded) return res.status(401).json({ message: 'Invalid or expired refresh token' });
+
+    if (!decoded) return res.status(401).json({ message: 'Refresh token si sahihi au imekwisha muda' });
 
     const newAccessToken = generateAccessToken({ id: decoded.id, phone: decoded.phone });
     return res.json({ accessToken: newAccessToken });
+
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 };

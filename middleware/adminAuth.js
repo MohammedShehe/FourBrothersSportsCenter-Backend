@@ -5,7 +5,7 @@ const adminAuth = (req, res, next) => {
   const authHeader = req.header('Authorization');
 
   if (!authHeader) {
-    return res.status(401).json({ message: 'Access denied. No token provided.' });
+    return res.status(401).json({ message: 'Ufikiaji umekataliwa. Hakuna tokeni iliyotolewa.' });
   }
 
   // Expect header format: "Bearer <token>"
@@ -17,7 +17,7 @@ const adminAuth = (req, res, next) => {
     next();
   } catch (err) {
     console.error("JWT verification failed:", err.message);
-    res.status(400).json({ message: 'Invalid token.' });
+    res.status(400).json({ message: 'Tokeni si sahihi.' });
   }
 };
 

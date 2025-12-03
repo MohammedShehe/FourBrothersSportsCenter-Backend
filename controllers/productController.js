@@ -26,7 +26,7 @@ exports.addProduct = async (req, res) => {
     const { name, company, color, discount_percent, type, size_us, stock, price } = req.body;
 
     if (!validTypes.includes(type)) {
-      return res.status(400).json({ message: "Invalid product type" });
+      return res.status(400).json({ message: "Aina ya bidhaa si sahihi" });
     }
 
     const [result] = await db.query(
@@ -50,11 +50,11 @@ exports.addProduct = async (req, res) => {
       await Promise.all(insertPromises);
     }
 
-    res.status(201).json({ message: "Product added successfully", product_id: productId });
+    res.status(201).json({ message: "Bidhaa imeongezwa kikamilifu", product_id: productId });
 
   } catch (err) {
     console.error("Add Product Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -76,7 +76,7 @@ exports.getProducts = async (req, res) => {
     res.json(products);
   } catch (err) {
     console.error("Get Products Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -89,7 +89,7 @@ exports.updateProduct = async (req, res) => {
     const { name, company, color, discount_percent, type, size_us, stock, price } = req.body;
 
     if (!validTypes.includes(type)) {
-      return res.status(400).json({ message: "Invalid product type" });
+      return res.status(400).json({ message: "Aina ya bidhaa si sahihi" });
     }
 
     await db.query(
@@ -113,11 +113,11 @@ exports.updateProduct = async (req, res) => {
       await Promise.all(insertPromises);
     }
 
-    res.json({ message: "Product updated successfully" });
+    res.json({ message: "Bidhaa imesasishwa kikamilifu" });
 
   } catch (err) {
     console.error("Update Product Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -131,9 +131,9 @@ exports.deleteProduct = async (req, res) => {
     // Delete product — images are not deleted from Cloudinary (optional)
     await db.query("DELETE FROM products WHERE id=?", [id]);
 
-    res.json({ message: "Product deleted successfully" });
+    res.json({ message: "Bidhaa imefutwa kikamilifu" });
   } catch (err) {
     console.error("Delete Product Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };

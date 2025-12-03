@@ -46,6 +46,7 @@ node_modules/
 .env
 
 # Database
+*.sql
 *.db
 *.sqlite
 *.sqlite3

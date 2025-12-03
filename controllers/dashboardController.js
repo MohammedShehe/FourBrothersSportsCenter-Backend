@@ -54,6 +54,6 @@ exports.getDashboardStats = async (req, res) => {
     });
   } catch (err) {
     console.error("Dashboard Stats Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };

@@ -12,21 +12,21 @@ dotenv.config();
 
 // ---------------------- VALIDATORS ----------------------
 const registerValidators = [
-  body('first_name').trim().notEmpty().withMessage('First name is required'),
-  body('last_name').trim().notEmpty().withMessage('Last name is required'),
-  body('phone').trim().notEmpty().withMessage('Phone is required'),
-  body('password').trim().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('first_name').trim().notEmpty().withMessage('Jina la kwanza linahitajika'),
+  body('last_name').trim().notEmpty().withMessage('Jina la familia linahitajika'),
+  body('phone').trim().notEmpty().withMessage('Nambari ya simu inahitajika'),
+  body('password').trim().isLength({ min: 6 }).withMessage('Nenosiri lazima liwe na herufi 6 au zaidi'),
   body('confirm_password').custom((value, { req }) => {
     if (value !== req.body.password) {
-      throw new Error('Passwords do not match');
+      throw new Error('Nenosiri halifanani');
     }
     return true;
   }),
   body('gender')
     .trim()
     .isIn(['mwanaume', 'mwanamke', 'nyengine'])
-    .withMessage('Gender must be mwanaume, mwanamke or nyengine'),
-  body('email').optional().isEmail().withMessage('Invalid email')
+    .withMessage('Jinsia lazima iwe mwanaume, mwanamke au nyengine'),
+  body('email').optional().isEmail().withMessage('Barua pepe si sahihi')
 ];
 
 // ---------------------- REGISTER CUSTOMER ----------------------
@@ -38,7 +38,7 @@ async function registerCustomer(req, res) {
     const { first_name, last_name, phone, email, address, gender, password } = req.body;
 
     const [existing] = await pool.execute('SELECT id FROM customers WHERE phone = ?', [phone]);
-    if (existing.length > 0) return res.status(409).json({ message: 'Phone already registered' });
+    if (existing.length > 0) return res.status(409).json({ message: 'Nambari ya simu tayari imesajiliwa' });
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -54,10 +54,10 @@ async function registerCustomer(req, res) {
       [result.insertId]
     );
 
-    return res.status(201).json({ message: 'Customer registered successfully', customer: rows[0] });
+    return res.status(201).json({ message: 'Mteja amesajiliwa kikamilifu', customer: rows[0] });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -67,7 +67,7 @@ async function loginCustomer(req, res) {
     const { phone, password } = req.body;
 
     if (!phone || !password) {
-      return res.status(400).json({ message: 'Phone and password are required' });
+      return res.status(400).json({ message: 'Nambari ya simu na nenosiri vinahitajika' });
     }
 
     // Check customer exists
@@ -76,7 +76,7 @@ async function loginCustomer(req, res) {
       [phone]
     );
     if (custRows.length === 0) {
-      return res.status(404).json({ message: 'Customer not found' });
+      return res.status(404).json({ message: 'Mteja hajapatikana' });
     }
 
     const customer = custRows[0];
@@ -84,14 +84,14 @@ async function loginCustomer(req, res) {
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, customer.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid password' });
+      return res.status(401).json({ message: 'Nenosiri si sahihi' });
     }
 
     const accessToken = generateAccessToken({ id: customer.id, phone: customer.phone });
     const refreshToken = generateRefreshToken({ id: customer.id, phone: customer.phone });
 
     return res.status(200).json({ 
-      message: 'Login successful', 
+      message: 'Ingia imefanikiwa', 
       accessToken, 
       refreshToken, 
       customer: {
@@ -106,7 +106,7 @@ async function loginCustomer(req, res) {
     });
   } catch (err) {
     console.error("Customer Login Error:", err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -116,7 +116,7 @@ async function requestPasswordReset(req, res) {
     const { first_name, last_name } = req.body;
 
     if (!first_name || !last_name) {
-      return res.status(400).json({ message: 'First name and last name are required' });
+      return res.status(400).json({ message: 'Jina la kwanza na jina la familia vinahitajika' });
     }
 
     const [custRows] = await pool.execute(
@@ -125,7 +125,7 @@ async function requestPasswordReset(req, res) {
     );
 
     if (custRows.length === 0) {
-      return res.status(404).json({ message: 'Customer not found with these details' });
+      return res.status(404).json({ message: 'Mteja hajapatikana kwa maelezo haya' });
     }
 
     const customer = custRows[0];
@@ -144,13 +144,13 @@ async function requestPasswordReset(req, res) {
     );
 
     return res.json({ 
-      message: 'Password reset authorized', 
+      message: 'Kubadilisha nenosiri kumeidhinishwa', 
       reset_token: resetToken,
-      next_step: 'Use this token to reset your password' 
+      next_step: 'Tumia tokeni hii kubadilisha nenosiri lako' 
     });
   } catch (err) {
     console.error("Request Password Reset Error:", err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -160,11 +160,11 @@ async function resetPassword(req, res) {
     const { reset_token, new_password, confirm_password } = req.body;
 
     if (!reset_token || !new_password || !confirm_password) {
-      return res.status(400).json({ message: 'All fields are required' });
+      return res.status(400).json({ message: 'Sehemu zote zinahitajika' });
     }
 
     if (new_password !== confirm_password) {
-      return res.status(400).json({ message: 'Passwords do not match' });
+      return res.status(400).json({ message: 'Nenosiri halifanani' });
     }
 
     // Verify reset token and check expiration
@@ -174,7 +174,7 @@ async function resetPassword(req, res) {
     );
 
     if (custRows.length === 0) {
-      return res.status(400).json({ message: 'Invalid or expired reset token' });
+      return res.status(400).json({ message: 'Tokeni ya kubadilisha nenosiri si sahihi au imeisha muda wake' });
     }
 
     const customer = custRows[0];
@@ -188,10 +188,10 @@ async function resetPassword(req, res) {
       [hashedPassword, customer.id]
     );
 
-    return res.json({ message: 'Password reset successful. You can now login with your new password.' });
+    return res.json({ message: 'Nenosiri limebadilishwa kikamilifu. Unaweza kuingia sasa kwa nenosiri jipya.' });
   } catch (err) {
     console.error("Reset Password Error:", err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -201,11 +201,11 @@ async function changeMobile(req, res) {
     const { first_name, last_name, new_mobile, confirm_mobile } = req.body;
 
     if (!first_name || !last_name || !new_mobile || !confirm_mobile) {
-      return res.status(400).json({ message: 'All fields are required' });
+      return res.status(400).json({ message: 'Sehemu zote zinahitajika' });
     }
 
     if (new_mobile !== confirm_mobile) {
-      return res.status(400).json({ message: 'Mobile numbers do not match' });
+      return res.status(400).json({ message: 'Nambari za simu hazifanani' });
     }
 
     const [custRows] = await pool.execute(
@@ -214,7 +214,7 @@ async function changeMobile(req, res) {
     );
 
     if (custRows.length === 0) {
-      return res.status(404).json({ message: 'Customer not found with these details' });
+      return res.status(404).json({ message: 'Mteja hajapatikana kwa maelezo haya' });
     }
 
     const customer = custRows[0];
@@ -226,7 +226,7 @@ async function changeMobile(req, res) {
     );
 
     if (existing.length > 0) {
-      return res.status(400).json({ message: 'Mobile number already in use' });
+      return res.status(400).json({ message: 'Nambari ya simu tayari inatumika' });
     }
 
     // Update mobile number
@@ -235,10 +235,10 @@ async function changeMobile(req, res) {
       [new_mobile, customer.id]
     );
 
-    return res.json({ message: 'Mobile number updated successfully. You can now login with your new mobile number.' });
+    return res.json({ message: 'Nambari ya simu imesasishwa kikamilifu. Unaweza kuingia sasa kwa nambari yako mpya ya simu.' });
   } catch (err) {
     console.error("Change Mobile Error:", err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -249,7 +249,7 @@ async function verifyPasswordForOrder(req, res) {
     const { password } = req.body;
 
     if (!password) {
-      return res.status(400).json({ message: 'Password is required' });
+      return res.status(400).json({ message: 'Nenosiri linahitajika' });
     }
 
     // Get customer
@@ -259,7 +259,7 @@ async function verifyPasswordForOrder(req, res) {
     );
 
     if (custRows.length === 0) {
-      return res.status(404).json({ message: 'Customer not found' });
+      return res.status(404).json({ message: 'Mteja hajapatikana' });
     }
 
     const customer = custRows[0];
@@ -267,13 +267,13 @@ async function verifyPasswordForOrder(req, res) {
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, customer.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid password' });
+      return res.status(401).json({ message: 'Nenosiri si sahihi' });
     }
 
-    return res.json({ message: 'Password verified successfully' });
+    return res.json({ message: 'Nenosiri limehakikiwa kikamilifu' });
   } catch (err) {
     console.error("Verify Password Error:", err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -284,7 +284,7 @@ async function confirmOrderReception(req, res) {
     const { password } = req.body;
 
     if (!password) {
-      return res.status(400).json({ message: "Password is required to confirm order reception" });
+      return res.status(400).json({ message: "Nenosiri linahitajika kuthibitisha kupokea agizo" });
     }
 
     const customerId = req.user.id;
@@ -296,13 +296,13 @@ async function confirmOrderReception(req, res) {
     );
 
     if (custRows.length === 0) {
-      return res.status(404).json({ message: "Customer not found" });
+      return res.status(404).json({ message: "Mteja hajapatikana" });
     }
 
     const customer = custRows[0];
     const isPasswordValid = await bcrypt.compare(password, customer.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: "Invalid password" });
+      return res.status(401).json({ message: "Nenosiri si sahihi" });
     }
 
     // Check order status
@@ -312,13 +312,13 @@ async function confirmOrderReception(req, res) {
     );
 
     if (orders.length === 0) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ message: "Agizo halijapatikana" });
     }
 
     const order = orders[0];
 
     if (order.status !== 'Inasafirishwa') {
-      return res.status(400).json({ message: "Order is not ready to be marked as received" });
+      return res.status(400).json({ message: "Agizo haliko tayari kuwekewa alama kama lililopokelewa" });
     }
 
     // Update order status to received
@@ -327,10 +327,10 @@ async function confirmOrderReception(req, res) {
       [order_id]
     );
 
-    return res.json({ message: "Order reception confirmed successfully" });
+    return res.json({ message: "Kupokea agizo kumethibitishwa kikamilifu" });
   } catch (err) {
     console.error("Confirm Order Reception Error:", err);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Hitilafu ya seva" });
   }
 }
 
@@ -342,11 +342,11 @@ async function getCustomerProfile(req, res) {
       'SELECT id, first_name, last_name, phone, email, address, gender, created_at FROM customers WHERE id = ?',
       [id]
     );
-    if (rows.length === 0) return res.status(404).json({ message: 'Customer not found' });
+    if (rows.length === 0) return res.status(404).json({ message: 'Mteja hajapatikana' });
     return res.json({ customer: rows[0] });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -356,19 +356,19 @@ async function updateProfile(req, res) {
     const { first_name, last_name, address, gender, new_phone, new_email, current_password } = req.body;
 
     const [custRows] = await pool.execute('SELECT * FROM customers WHERE id = ?', [id]);
-    if (custRows.length === 0) return res.status(404).json({ message: 'Customer not found' });
+    if (custRows.length === 0) return res.status(404).json({ message: 'Mteja hajapatikana' });
 
     const customer = custRows[0];
 
     // Verify current password for sensitive changes
     if (new_phone || new_email) {
       if (!current_password) {
-        return res.status(400).json({ message: 'Current password is required for this change' });
+        return res.status(400).json({ message: 'Nenosiri la sasa linahitajika kwa mabadiliko haya' });
       }
       
       const isPasswordValid = await bcrypt.compare(current_password, customer.password);
       if (!isPasswordValid) {
-        return res.status(401).json({ message: 'Invalid current password' });
+        return res.status(401).json({ message: 'Nenosiri la sasa si sahihi' });
       }
     }
 
@@ -376,7 +376,7 @@ async function updateProfile(req, res) {
       // Check if new phone is already taken
       const [existing] = await pool.execute('SELECT id FROM customers WHERE phone = ? AND id != ?', [new_phone, id]);
       if (existing.length > 0) {
-        return res.status(400).json({ message: 'Phone number already in use' });
+        return res.status(400).json({ message: 'Nambari ya simu tayari inatumika' });
       }
       await pool.execute('UPDATE customers SET phone = ? WHERE id = ?', [new_phone, id]);
     }
@@ -402,10 +402,10 @@ async function updateProfile(req, res) {
       [id]
     );
 
-    return res.json({ message: 'Profile updated', customer: updated[0] });
+    return res.json({ message: 'Wasifu umesasishwa', customer: updated[0] });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -416,18 +416,18 @@ async function changeEmail(req, res) {
     const { new_email, current_password } = req.body;
 
     if (!new_email || !current_password) {
-      return res.status(400).json({ message: 'New email and current password are required' });
+      return res.status(400).json({ message: 'Barua pepe mpya na nenosiri la sasa vinahitajika' });
     }
 
     const [custRows] = await pool.execute('SELECT * FROM customers WHERE id = ?', [id]);
-    if (custRows.length === 0) return res.status(404).json({ message: 'Customer not found' });
+    if (custRows.length === 0) return res.status(404).json({ message: 'Mteja hajapatikana' });
 
     const customer = custRows[0];
 
     // Verify current password
     const isPasswordValid = await bcrypt.compare(current_password, customer.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid current password' });
+      return res.status(401).json({ message: 'Nenosiri la sasa si sahihi' });
     }
 
     // Update email
@@ -438,10 +438,10 @@ async function changeEmail(req, res) {
       [id]
     );
 
-    return res.json({ message: 'Email updated successfully', customer: updated[0] });
+    return res.json({ message: 'Barua pepe imesasishwa kikamilifu', customer: updated[0] });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -451,24 +451,24 @@ async function changePhone(req, res) {
     const { new_phone, current_password } = req.body;
 
     if (!new_phone || !current_password) {
-      return res.status(400).json({ message: 'New phone and current password are required' });
+      return res.status(400).json({ message: 'Nambari ya simu mpya na nenosiri la sasa vinahitajika' });
     }
 
     const [custRows] = await pool.execute('SELECT * FROM customers WHERE id = ?', [id]);
-    if (custRows.length === 0) return res.status(404).json({ message: 'Customer not found' });
+    if (custRows.length === 0) return res.status(404).json({ message: 'Mteja hajapatikana' });
 
     const customer = custRows[0];
 
     // Verify current password
     const isPasswordValid = await bcrypt.compare(current_password, customer.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid current password' });
+      return res.status(401).json({ message: 'Nenosiri la sasa si sahihi' });
     }
 
     // Check if new phone is already taken
     const [existing] = await pool.execute('SELECT id FROM customers WHERE phone = ? AND id != ?', [new_phone, id]);
     if (existing.length > 0) {
-      return res.status(400).json({ message: 'Phone number already in use' });
+      return res.status(400).json({ message: 'Nambari ya simu tayari inatumika' });
     }
 
     // Update phone
@@ -479,10 +479,10 @@ async function changePhone(req, res) {
       [id]
     );
 
-    return res.json({ message: 'Phone number updated successfully', customer: updated[0] });
+    return res.json({ message: 'Nambari ya simu imesasishwa kikamilifu', customer: updated[0] });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -492,22 +492,22 @@ async function changePassword(req, res) {
     const { current_password, new_password, confirm_password } = req.body;
 
     if (!current_password || !new_password || !confirm_password) {
-      return res.status(400).json({ message: 'All password fields are required' });
+      return res.status(400).json({ message: 'Sehemu zote za nenosiri zinahitajika' });
     }
 
     if (new_password !== confirm_password) {
-      return res.status(400).json({ message: 'New passwords do not match' });
+      return res.status(400).json({ message: 'Nenosiri jipya halifanani' });
     }
 
     const [custRows] = await pool.execute('SELECT * FROM customers WHERE id = ?', [id]);
-    if (custRows.length === 0) return res.status(404).json({ message: 'Customer not found' });
+    if (custRows.length === 0) return res.status(404).json({ message: 'Mteja hajapatikana' });
 
     const customer = custRows[0];
 
     // Verify current password
     const isPasswordValid = await bcrypt.compare(current_password, customer.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid current password' });
+      return res.status(401).json({ message: 'Nenosiri la sasa si sahihi' });
     }
 
     // Hash new password
@@ -516,10 +516,10 @@ async function changePassword(req, res) {
     // Update password
     await pool.execute('UPDATE customers SET password = ? WHERE id = ?', [hashedPassword, id]);
 
-    return res.json({ message: 'Password changed successfully' });
+    return res.json({ message: 'Nenosiri limebadilishwa kikamilifu' });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -532,7 +532,7 @@ async function getAds(req, res) {
     return res.json({ ads });
   } catch (err) {
     console.error('Get Ads Error:', err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -551,7 +551,7 @@ async function getAnnouncements(req, res) {
     return res.json({ announcement: rows[0] });
   } catch (err) {
     console.error('Get Announcements Error:', err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -581,7 +581,7 @@ async function getAllProducts(req, res) {
     res.json(products);
   } catch (err) {
     console.error('Customer Get Products Error:', err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -595,7 +595,7 @@ async function getProductById(req, res) {
       [id]
     );
 
-    if (rows.length === 0) return res.status(404).json({ message: 'Product not found' });
+    if (rows.length === 0) return res.status(404).json({ message: 'Bidhaa haijapatikana' });
 
     const product = rows[0];
     const [images] = await pool.execute(
@@ -614,7 +614,7 @@ async function getProductById(req, res) {
     res.json(product);
   } catch (err) {
     console.error('Customer Get Product Error:', err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -625,7 +625,7 @@ async function placeOrder(req, res) {
     const { items } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0)
-      return res.status(400).json({ message: 'Order items required' });
+      return res.status(400).json({ message: 'Vipengee vya agizo vinahitajika' });
 
     let totalAmount = 0;
     const orderItemsData = [];
@@ -633,17 +633,17 @@ async function placeOrder(req, res) {
     for (let item of items) {
       const { product_id, quantity } = item;
       if (!product_id || !quantity || quantity < 1)
-        return res.status(400).json({ message: 'Invalid product or quantity' });
+        return res.status(400).json({ message: 'Bidhaa au idadi si sahihi' });
 
       const [products] = await pool.execute(
         'SELECT price, stock, discount_percent FROM products WHERE id = ?',
         [product_id]
       );
-      if (products.length === 0) return res.status(404).json({ message: `Product ${product_id} not found` });
+      if (products.length === 0) return res.status(404).json({ message: `Bidhaa ${product_id} haijapatikana` });
 
       const product = products[0];
       if (product.stock < quantity)
-        return res.status(400).json({ message: `Insufficient stock for product ${product_id}` });
+        return res.status(400).json({ message: `Hakuna hesabu ya kutosha ya bidhaa ${product_id}` });
 
       const discountPercent = product.discount_percent || 0;
       const unitPrice = product.price * (1 - discountPercent / 100);
@@ -671,10 +671,10 @@ async function placeOrder(req, res) {
       await pool.execute('UPDATE products SET stock = stock - ? WHERE id = ?', [item.quantity, item.product_id]);
     }
 
-    res.status(201).json({ message: 'Order placed successfully', order_id, total_price: totalAmount, status: 'Imewekwa' });
+    res.status(201).json({ message: 'Agizo limewekwa kikamilifu', order_id, total_price: totalAmount, status: 'Imewekwa' });
   } catch (err) {
     console.error('Place Order Error:', err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 
@@ -692,7 +692,7 @@ async function getCustomerOrders(req, res) {
     res.json({ orders });
   } catch (err) {
     console.error("Get Customer Orders Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 }
 
@@ -703,25 +703,25 @@ async function cancelOrder(req, res) {
     const { order_id } = req.params;
     const { reason } = req.body;
 
-    if (!reason) return res.status(400).json({ message: "Cancellation reason is required" });
+    if (!reason) return res.status(400).json({ message: "Sababu ya kughairi inahitajika" });
 
     const [orders] = await pool.execute(
       'SELECT status FROM orders WHERE id = ? AND customer_id = ?',
       [order_id, customerId]
     );
-    if (orders.length === 0) return res.status(404).json({ message: "Order not found" });
+    if (orders.length === 0) return res.status(404).json({ message: "Agizo halijapatikana" });
 
-    if (orders[0].status !== 'Imewekwa') return res.status(400).json({ message: "Only orders with status 'Imewekwa' can be cancelled" });
+    if (orders[0].status !== 'Imewekwa') return res.status(400).json({ message: "Agizo lenye hali ya 'Imewekwa' tu ndilo linaweza kughairiwa" });
 
     await pool.execute('UPDATE orders SET status="Ghairishwa" WHERE id=?', [order_id]);
 
-    const message = `Order id ${order_id} imeghairishwa kwasababu ${reason}`;
+    const message = `Agizo id ${order_id} imeghairishwa kwasababu ${reason}`;
     await pool.execute('INSERT INTO customer_notifications (customer_id, message) VALUES (?, ?)', [customerId, message]);
 
-    res.json({ message: "Order cancelled successfully" });
+    res.json({ message: "Agizo limeghairiwa kikamilifu" });
   } catch (err) {
     console.error("Cancel Order Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 }
 
@@ -732,36 +732,36 @@ async function returnOrder(req, res) {
     const { order_id } = req.params;
     const { reason, productCondition } = req.body;
 
-    if (!reason) return res.status(400).json({ message: "Return reason is required" });
+    if (!reason) return res.status(400).json({ message: "Sababu ya kurudisha inahitajika" });
     
     if (!productCondition.originalPackaging || !productCondition.tagsAttached || !productCondition.notUsed) {
-        return res.status(400).json({ message: "Product must be in original packaging, tags attached, and unused." });
+        return res.status(400).json({ message: "Bidhaa lazima iwe katika mfuko wa asili, lebo zimeunganishwa, na haijatumika." });
     }
 
     const [orders] = await pool.execute(
       'SELECT status, created_at FROM orders WHERE id=? AND customer_id=?',
       [order_id, customerId]
     );
-    if (orders.length === 0) return res.status(404).json({ message: "Order not found" });
+    if (orders.length === 0) return res.status(404).json({ message: "Agizo halijapatikana" });
 
     const order = orders[0];
-    if (order.status !== 'Imepokelewa') return res.status(400).json({ message: "Bidhaa Uliyopokea tu ndio utaweza kurudisha" });
+    if (order.status !== 'Imepokelewa') return res.status(400).json({ message: "Bidhaa uliyopokea tu ndio utaweza kurudisha" });
 
     const diffDays = Math.floor((new Date() - new Date(order.created_at)) / (1000 * 60 * 60 * 24));
-    if (diffDays > 3) return res.status(400).json({ message: "Return period (3 days) has expired" });
+    if (diffDays > 3) return res.status(400).json({ message: "Muda wa kurudisha (siku 3) umekwisha" });
 
     await pool.execute('UPDATE orders SET status="Kurudishwa" WHERE id=?', [order_id]);
 
-    const message = `Order id ${order_id} inaombwa kurudishwa kwasababu ${reason}`;
+    const message = `Agizo id ${order_id} inaombwa kurudishwa kwasababu ${reason}`;
     await pool.execute(
       'INSERT INTO customer_notifications (customer_id, message) VALUES (?, ?)',
       [customerId, message]
     );
 
-    res.json({ message: "Order return requested successfully" });
+    res.json({ message: "Ombi la kurudisha agizo limewasilishwa kikamilifu" });
   } catch (err) {
     console.error("Return Order Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 }
 
@@ -773,15 +773,15 @@ async function rateOrder(req, res) {
     const { package_rating, delivery_rating, product_rating, overall_comment } = req.body;
 
     if (![package_rating, delivery_rating, product_rating].every(r => r >= 1 && r <= 5)) {
-      return res.status(400).json({ message: "Ratings must be between 1 and 5" });
+      return res.status(400).json({ message: "Ukadiriaji uwe kati ya 1 na 5" });
     }
 
     const [orders] = await pool.execute(
       'SELECT status FROM orders WHERE id=? AND customer_id=?',
       [order_id, customerId]
     );
-    if (orders.length === 0) return res.status(404).json({ message: "Order not found" });
-    if (orders[0].status !== 'Imepokelewa') return res.status(400).json({ message: "Only received orders can be rated" });
+    if (orders.length === 0) return res.status(404).json({ message: "Agizo halijapatikana" });
+    if (orders[0].status !== 'Imepokelewa') return res.status(400).json({ message: "Agizo lililopokelewa tu ndilo linaweza kupimwa" });
 
     await pool.execute(
       `INSERT INTO order_ratings (order_id, customer_id, package_rating, delivery_rating, product_rating, overall_comment)
@@ -795,10 +795,10 @@ async function rateOrder(req, res) {
       [order_id, customerId, package_rating, delivery_rating, product_rating, overall_comment]
     );
 
-    res.json({ message: "Order rated successfully" });
+    res.json({ message: "Agizo limepimwa kikamilifu" });
   } catch (err) {
     console.error("Rate Order Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 }
 
@@ -818,7 +818,7 @@ async function getProductRatings(req, res) {
     res.json({ ratings });
   } catch (err) {
     console.error("Get Product Ratings Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 }
 
@@ -829,33 +829,33 @@ async function sendCustomerMessage(req, res) {
     const { message } = req.body;
 
     if (!message)
-      return res.status(400).json({ message: ' Ujumbe Unahitajika!' });
+      return res.status(400).json({ message: 'Ujumbe Unahitajika!' });
 
     const [result] = await pool.execute(
       'INSERT INTO customer_notifications (customer_id, message) VALUES (?, ?)',
       [customer_id, message]
     );
 
-    return res.status(201).json({ message: 'Message imetumwa', id: result.insertId });
+    return res.status(201).json({ message: 'Ujumbe umetumwa', id: result.insertId });
   } catch (err) {
     console.error("Send Message Error:", err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 // ---------------------- REFRESH TOKEN ----------------------
 async function refreshToken(req, res) {
   try {
     const { refreshToken: token } = req.body;
-    if (!token) return res.status(401).json({ message: 'No refresh token provided' });
+    if (!token) return res.status(401).json({ message: 'Hakuna tokeni ya kufanyia upya ilitolewa' });
 
     const decoded = verifyRefreshToken(token);
-    if (!decoded) return res.status(401).json({ message: 'Invalid or expired refresh token' });
+    if (!decoded) return res.status(401).json({ message: 'Tokeni ya kufanyia upya si sahihi au imeisha muda wake' });
 
     const newAccessToken = generateAccessToken({ id: decoded.id, phone: decoded.phone });
     return res.json({ accessToken: newAccessToken });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Hitilafu ya seva' });
   }
 }
 

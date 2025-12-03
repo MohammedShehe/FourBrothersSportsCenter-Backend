@@ -9,7 +9,7 @@ const cloudinary = require('../config/cloudinary');
 exports.postAd = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: "Image is required" });
+      return res.status(400).json({ message: "Picha inahitajika" });
     }
 
     const { link } = req.body;
@@ -20,7 +20,7 @@ exports.postAd = async (req, res) => {
       async (error, result) => {
         if (error) {
           console.error("Cloudinary Upload Error:", error);
-          return res.status(500).json({ message: "Cloudinary upload failed" });
+          return res.status(500).json({ message: "Upakiaji wa Cloudinary umeshindwa" });
         }
 
         await db.query(
@@ -29,7 +29,7 @@ exports.postAd = async (req, res) => {
         );
 
         res.status(201).json({
-          message: "Ad posted successfully",
+          message: "Tangazo limechapishwa kikamilifu",
           image_url: result.secure_url
         });
       }
@@ -39,7 +39,7 @@ exports.postAd = async (req, res) => {
 
   } catch (err) {
     console.error("Post Ad Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -54,7 +54,7 @@ exports.getAds = async (req, res) => {
     );
   } catch (err) {
     console.error("Get Ads Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -64,7 +64,7 @@ exports.deleteAd = async (req, res) => {
     const { id } = req.params;
 
     const [rows] = await db.query("SELECT image_url FROM ads WHERE id=?", [id]);
-    if (rows.length === 0) return res.status(404).json({ message: "Ad not found" });
+    if (rows.length === 0) return res.status(404).json({ message: "Tangazo halijapatikana" });
 
     const imageUrl = rows[0].image_url;
 
@@ -80,11 +80,11 @@ exports.deleteAd = async (req, res) => {
 
     await db.query("DELETE FROM ads WHERE id=?", [id]);
 
-    res.json({ message: "Ad deleted successfully" });
+    res.json({ message: "Tangazo limefutwa kikamilifu" });
 
   } catch (err) {
     console.error("Delete Ad Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -101,14 +101,14 @@ exports.viewCustomerNotifications = async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("View Customer Notifications Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
 exports.sendMessage = async (req, res) => {
   try {
     const { content, customer_ids } = req.body;
-    if (!content) return res.status(400).json({ message: "Message content is required" });
+    if (!content) return res.status(400).json({ message: "Maudhui ya ujumbe yanahitajika" });
 
     let emails = [];
 
@@ -124,16 +124,16 @@ exports.sendMessage = async (req, res) => {
       emails = rows.map(r => r.email);
     }
 
-    if (emails.length === 0) return res.status(400).json({ message: "No customers with email found" });
+    if (emails.length === 0) return res.status(400).json({ message: "Hakuna wateja walio na barua pepe walipatikana" });
 
-    await sendBulkEmail(emails, "Notification from Four Brothers Sports Center", content);
+    await sendBulkEmail(emails, "Taarifa kutoka Four Brothers Sports Center", content);
 
     await db.query("INSERT INTO admin_notifications (content, type) VALUES (?, 'email')", [content]);
 
-    res.json({ message: "Email notification sent successfully" });
+    res.json({ message: "Taarifa ya barua pepe imetumwa kikamilifu" });
   } catch (err) {
     console.error("Send Admin Message Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -141,7 +141,7 @@ exports.sendInAppMessageOnly = async (req, res) => {
   try {
     const { content, customer_ids } = req.body;
     if (!content || !content.trim()) {
-      return res.status(400).json({ message: "Message content is required" });
+      return res.status(400).json({ message: "Maudhui ya ujumbe yanahitajika" });
     }
 
     await db.query("DELETE FROM admin_notifications WHERE type='announcement'");
@@ -167,10 +167,10 @@ exports.sendInAppMessageOnly = async (req, res) => {
       inserted = result.affectedRows;
     }
 
-    res.json({ message: "In-app message posted successfully", inserted });
+    res.json({ message: "Ujumbe wa ndani wa programu umechapishwa kikamilifu", inserted });
   } catch (err) {
     console.error("Send In-App Message Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -191,7 +191,7 @@ exports.getAllOrders = async (req, res) => {
     res.json(orders);
   } catch (err) {
     console.error("Get Orders Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -204,16 +204,16 @@ exports.updateOrderStatus = async (req, res) => {
     const allowedStatuses = ['Imewekwa', 'Inasafirishwa', 'Ghairishwa', 'Kurudishwa'];
     
     if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({ message: "Invalid status" });
+      return res.status(400).json({ message: "Hali si sahihi" });
     }
 
     const [result] = await db.query("UPDATE orders SET status=? WHERE id=?", [status, order_id]);
 
-    if (result.affectedRows === 0) return res.status(404).json({ message: "Order not found" });
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Agizo halijapatikana" });
 
-    res.json({ message: "Order status updated successfully" });
+    res.json({ message: "Hali ya agizo imesasishwa kikamilifu" });
   } catch (err) {
     console.error("Update Order Status Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };

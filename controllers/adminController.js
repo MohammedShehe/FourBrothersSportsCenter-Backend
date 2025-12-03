@@ -4,33 +4,30 @@ const bcrypt = require('bcrypt');
 require('dotenv').config();
 
 // ---------------------- ADMIN LOGIN ----------------------
-exports.adminLogin = async (req, res) => {  // Renamed from login
+exports.adminLogin = async (req, res) => {
   try {
     const { mobile, password } = req.body;
 
     if (!mobile || !password) {
-      return res.status(400).json({ message: "Mobile number and password are required" });
+      return res.status(400).json({ message: "Namba ya simu na nywila zinahitajika" });
     }
 
-    // Check if admin exists
     const [rows] = await db.query(
       "SELECT * FROM users WHERE mobile=? AND is_admin=1 LIMIT 1",
       [mobile]
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: "Admin not found" });
+      return res.status(404).json({ message: "Taarifa za msimamizi hazijapatikana" });
     }
 
     const admin = rows[0];
 
-    // Verify password
     const isPasswordValid = await bcrypt.compare(password, admin.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: "Invalid password" });
+      return res.status(401).json({ message: "Nywila si sahihi" });
     }
 
-    // Generate JWT token
     const token = jwt.sign(
       { 
         id: admin.id, 
@@ -42,7 +39,7 @@ exports.adminLogin = async (req, res) => {  // Renamed from login
     );
 
     res.json({
-      message: "Login successful",
+      message: "Umefanikiwa kuingia",
       token,
       admin: {
         id: admin.id,
@@ -55,7 +52,7 @@ exports.adminLogin = async (req, res) => {  // Renamed from login
 
   } catch (err) {
     console.error("Admin Login Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -65,39 +62,35 @@ exports.forgotPassword = async (req, res) => {
     const { first_name, last_name } = req.body;
 
     if (!first_name || !last_name) {
-      return res.status(400).json({ message: "First name and last name are required" });
+      return res.status(400).json({ message: "Jina la kwanza na jina la mwisho vinahitajika" });
     }
 
-    // Check if admin exists
     const [rows] = await db.query(
       "SELECT * FROM users WHERE first_name=? AND last_name=? AND is_admin=1 LIMIT 1",
       [first_name, last_name]
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: "Admin not found with these details" });
+      return res.status(404).json({ message: "Msimamizi mwenye taarifa hizi hajapatikana" });
     }
 
     const admin = rows[0];
 
-    // Generate reset token
     const resetToken = jwt.sign(
       { id: admin.id, type: 'password_reset' },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    // In a real app, send this token via email/SMS
-    // For now, return it (in production, send via email)
     res.json({
-      message: "Password reset authorized",
+      message: "Umeidhinishwa kubadili nywila",
       reset_token: resetToken,
-      next_step: "Use this token to reset your password"
+      next_step: "Tumia tokeni hii kubadili nywila yako"
     });
 
   } catch (err) {
     console.error("Admin Forgot Password Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -107,39 +100,36 @@ exports.resetPassword = async (req, res) => {
     const { reset_token, new_password, confirm_password } = req.body;
 
     if (!reset_token || !new_password || !confirm_password) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res.status(400).json({ message: "Tafadhali jaza sehemu zote" });
     }
 
     if (new_password !== confirm_password) {
-      return res.status(400).json({ message: "Passwords do not match" });
+      return res.status(400).json({ message: "Nywila hazifanani" });
     }
 
-    // Verify reset token
     let decoded;
     try {
       decoded = jwt.verify(reset_token, process.env.JWT_SECRET);
     } catch (err) {
-      return res.status(400).json({ message: "Invalid or expired reset token" });
+      return res.status(400).json({ message: "Tokeni batili au imekwisha muda wake" });
     }
 
     if (decoded.type !== 'password_reset') {
-      return res.status(400).json({ message: "Invalid token type" });
+      return res.status(400).json({ message: "Aina ya tokeni si sahihi" });
     }
 
-    // Hash new password
     const hashedPassword = await bcrypt.hash(new_password, 10);
 
-    // Update password
     await db.query(
       "UPDATE users SET password=? WHERE id=?",
       [hashedPassword, decoded.id]
     );
 
-    res.json({ message: "Password reset successful. You can now login with your new password." });
+    res.json({ message: "Umefanikiwa kubadili nywila. Sasa unaweza kuingia tena." });
 
   } catch (err) {
     console.error("Reset Admin Password Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
@@ -149,105 +139,96 @@ exports.changeMobile = async (req, res) => {
     const { first_name, last_name, new_mobile, confirm_mobile } = req.body;
 
     if (!first_name || !last_name || !new_mobile || !confirm_mobile) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res.status(400).json({ message: "Tafadhali jaza sehemu zote" });
     }
 
     if (new_mobile !== confirm_mobile) {
-      return res.status(400).json({ message: "Mobile numbers do not match" });
+      return res.status(400).json({ message: "Namba mpya hazifanani" });
     }
 
-    // Check if admin exists
     const [rows] = await db.query(
       "SELECT * FROM users WHERE first_name=? AND last_name=? AND is_admin=1 LIMIT 1",
       [first_name, last_name]
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: "Admin not found with these details" });
+      return res.status(404).json({ message: "Msimamizi mwenye taarifa hizi hajapatikana" });
     }
 
     const admin = rows[0];
 
-    // Check if new mobile is already taken
     const [existing] = await db.query(
       "SELECT id FROM users WHERE mobile=? AND id!=?",
       [new_mobile, admin.id]
     );
 
     if (existing.length > 0) {
-      return res.status(400).json({ message: "Mobile number already in use" });
+      return res.status(400).json({ message: "Namba hii ya simu imeshatumika" });
     }
 
-    // Update mobile number
     await db.query(
       "UPDATE users SET mobile=? WHERE id=?",
       [new_mobile, admin.id]
     );
 
-    res.json({ message: "Mobile number updated successfully. You can now login with your new mobile number." });
+    res.json({ message: "Namba ya simu imebadilishwa kikamilifu. Sasa unaweza kutumia namba mpya kuingia." });
 
   } catch (err) {
     console.error("Change Admin Mobile Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
-// ---------------------- ADD NEW ADMIN (Only by main admin) ----------------------
+// ---------------------- ADD NEW ADMIN ----------------------
 exports.addAdmin = async (req, res) => {
   try {
-    // Check if requester is main admin
     if (!req.admin.can_manage_admins) {
-      return res.status(403).json({ message: "Only main admin can add other admins" });
+      return res.status(403).json({ message: "Ni msimamizi mkuu pekee anayeruhusiwa kuongeza wasimamizi wengine" });
     }
 
     const { first_name, last_name, mobile, password, confirm_password } = req.body;
 
     if (!first_name || !last_name || !mobile || !password || !confirm_password) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res.status(400).json({ message: "Tafadhali jaza sehemu zote" });
     }
 
     if (password !== confirm_password) {
-      return res.status(400).json({ message: "Passwords do not match" });
+      return res.status(400).json({ message: "Nywila hazifanani" });
     }
 
-    // Check if mobile already exists
     const [existing] = await db.query("SELECT id FROM users WHERE mobile=?", [mobile]);
     if (existing.length > 0) {
-      return res.status(400).json({ message: "Mobile number already registered" });
+      return res.status(400).json({ message: "Namba hii ya simu imeshasajiliwa" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert new admin (can_manage_admins = 0 for non-main admins)
     await db.query(
       "INSERT INTO users (first_name, last_name, mobile, password, is_admin, can_manage_admins) VALUES (?, ?, ?, ?, 1, 0)",
       [first_name, last_name, mobile, hashedPassword]
     );
 
-    res.status(201).json({ message: "Admin added successfully" });
+    res.status(201).json({ message: "Msimamizi ameongezwa kikamilifu" });
 
   } catch (err) {
     console.error("Add Admin Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
-// ---------------------- UPDATE ADMIN CREDENTIALS (Only by main admin) ----------------------
+// ---------------------- UPDATE ADMIN ----------------------
 exports.updateAdmin = async (req, res) => {
   try {
-    // Check if requester is main admin
     if (!req.admin.can_manage_admins) {
-      return res.status(403).json({ message: "Only main admin can update admin credentials" });
+      return res.status(403).json({ message: "Ni msimamizi mkuu pekee anayeruhusiwa kubadili taarifa za wasimamizi" });
     }
 
     const { id } = req.params;
     const { first_name, last_name, mobile, password } = req.body;
 
-    // Check if admin exists
     const [adminRows] = await db.query("SELECT * FROM users WHERE id=? AND is_admin=1", [id]);
     if (adminRows.length === 0) {
-      return res.status(404).json({ message: "Admin not found" });
+      return res.status(404).json({ message: "Msimamizi hajapatikana" });
     }
 
     const updateFields = [];
@@ -264,13 +245,12 @@ exports.updateAdmin = async (req, res) => {
     }
 
     if (mobile) {
-      // Check if mobile is already taken by another admin
       const [existing] = await db.query(
         "SELECT id FROM users WHERE mobile=? AND id!=?",
         [mobile, id]
       );
       if (existing.length > 0) {
-        return res.status(400).json({ message: "Mobile number already in use" });
+        return res.status(400).json({ message: "Namba hii ya simu imetumika tayari" });
       }
       updateFields.push("mobile=?");
       updateValues.push(mobile);
@@ -283,7 +263,7 @@ exports.updateAdmin = async (req, res) => {
     }
 
     if (updateFields.length === 0) {
-      return res.status(400).json({ message: "No fields to update" });
+      return res.status(400).json({ message: "Hakuna taarifa za kubadili" });
     }
 
     updateValues.push(id);
@@ -291,27 +271,25 @@ exports.updateAdmin = async (req, res) => {
 
     await db.query(query, updateValues);
 
-    res.json({ message: "Admin updated successfully" });
+    res.json({ message: "Taarifa za msimamizi zimebadilishwa kikamilifu" });
 
   } catch (err) {
     console.error("Update Admin Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
-// ---------------------- GET ALL ADMINS (Only by main admin) ----------------------
+// ---------------------- GET ALL ADMINS ----------------------
 exports.getAdmins = async (req, res) => {
   try {
-    // Check if requester is main admin
     if (!req.admin.can_manage_admins) {
-      return res.status(403).json({ message: "Only main admin can view all admins" });
+      return res.status(403).json({ message: "Ni msimamizi mkuu pekee anayeruhusiwa kuona orodha ya wasimamizi" });
     }
 
     const [admins] = await db.query(
       "SELECT id, first_name, last_name, mobile, can_manage_admins, created_at FROM users WHERE is_admin=1 ORDER BY created_at DESC"
     );
 
-    // Remove password from response
     const safeAdmins = admins.map(admin => ({
       ...admin,
       can_manage_admins: admin.can_manage_admins === 1
@@ -321,37 +299,34 @@ exports.getAdmins = async (req, res) => {
 
   } catch (err) {
     console.error("Get Admins Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
 
-// ---------------------- DELETE ADMIN (Only by main admin) ----------------------
+// ---------------------- DELETE ADMIN ----------------------
 exports.deleteAdmin = async (req, res) => {
   try {
-    // Check if requester is main admin
     if (!req.admin.can_manage_admins) {
-      return res.status(403).json({ message: "Only main admin can delete admins" });
+      return res.status(403).json({ message: "Ni msimamizi mkuu pekee anayeruhusiwa kufuta wasimamizi" });
     }
 
     const { id } = req.params;
 
-    // Prevent deleting main admin (id=1)
     if (parseInt(id) === 1) {
-      return res.status(400).json({ message: "Cannot delete main admin" });
+      return res.status(400).json({ message: "Huwezi kufuta msimamizi mkuu" });
     }
 
-    // Check if admin exists
     const [adminRows] = await db.query("SELECT id FROM users WHERE id=? AND is_admin=1", [id]);
     if (adminRows.length === 0) {
-      return res.status(404).json({ message: "Admin not found" });
+      return res.status(404).json({ message: "Msimamizi hajapatikana" });
     }
 
     await db.query("DELETE FROM users WHERE id=?", [id]);
 
-    res.json({ message: "Admin deleted successfully" });
+    res.json({ message: "Msimamizi amefutwa kikamilifu" });
 
   } catch (err) {
     console.error("Delete Admin Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };

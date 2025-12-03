@@ -3,8 +3,8 @@ const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 dotenv.config();
 
-const ACCESS_SECRET = process.env.JWT_SECRET || 'access_secret';
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh_secret';
+const ACCESS_SECRET = process.env.JWT_SECRET;
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
 /**
  * Middleware to verify access token
@@ -17,7 +17,7 @@ function authMiddleware(req, res, next) {
       : authHeader;
 
     if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
+      return res.status(401).json({ message: 'Hakuna tokeni iliyotolewa' });
     }
 
     const decoded = jwt.verify(token, ACCESS_SECRET);
@@ -25,7 +25,7 @@ function authMiddleware(req, res, next) {
     next();
   } catch (err) {
     console.error('Access token error:', err.message);
-    return res.status(401).json({ message: 'Invalid or expired token' });
+    return res.status(401).json({ message: 'Tokeni si sahihi au imeisha muda wake' });
   }
 }
 

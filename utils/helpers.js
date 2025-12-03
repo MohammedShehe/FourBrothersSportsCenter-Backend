@@ -38,11 +38,11 @@ async function sendBulkEmail(emails, subject, content) {
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`📧 Email sent to: ${emails}`);
+    console.log(`📧 Barua pepe imetumwa kwa: ${emails}`);
     return { success: true };
 
   } catch (err) {
-    console.error("⚠️ Email sending failed:", err.message);
+    console.error("⚠️ Kukitumia barua pepe kumeshindwa:", err.message);
     return { success: false, error: err.message };
   }
 }

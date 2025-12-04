@@ -9,12 +9,7 @@ dotenv.config();
 const app = express();
 
 // ----------------- Middlewares -----------------
-const corsOptions = {
-    origin: ['https://yourfrontenddomain.com', 'http://localhost:3000'],
-    credentials: true,
-    optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));

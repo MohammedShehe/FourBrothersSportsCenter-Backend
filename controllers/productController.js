@@ -18,39 +18,94 @@ const uploadToCloudinary = (fileBuffer) => {
   });
 };
 
+
 // ==========================
-// ADD PRODUCT
+// ADD PRODUCT (Updated for multiple sizes)
 // ==========================
 exports.addProduct = async (req, res) => {
   try {
-    const { name, company, color, discount_percent, type, size_us, stock, price } = req.body;
+    const { 
+      name, 
+      company, 
+      color, 
+      discount_percent, 
+      type, 
+      price, 
+      description,
+      sizes // New: JSON string containing sizes and stocks
+    } = req.body;
 
     if (!validTypes.includes(type)) {
       return res.status(400).json({ message: "Aina ya bidhaa si sahihi" });
     }
 
-    const [result] = await db.query(
-      `INSERT INTO products (name, company, color, discount_percent, type, size_us, stock, price)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, company, color, discount_percent, type, size_us, stock, price]
-    );
-
-    const productId = result.insertId;
-
-    // Upload images to Cloudinary
-    if (req.files && req.files.length > 0) {
-      const uploadPromises = req.files.map(file => uploadToCloudinary(file.buffer));
-
-      const imageUrls = await Promise.all(uploadPromises);
-
-      const insertPromises = imageUrls.map(url =>
-        db.query("INSERT INTO product_images (product_id, image_url) VALUES (?, ?)", [productId, url])
-      );
-
-      await Promise.all(insertPromises);
+    // Parse sizes if provided
+    let sizeData = [];
+    if (sizes) {
+      try {
+        sizeData = JSON.parse(sizes);
+      } catch (err) {
+        return res.status(400).json({ message: "Maelezo ya saizi si sahihi" });
+      }
     }
 
-    res.status(201).json({ message: "Bidhaa imeongezwa kikamilifu", product_id: productId });
+    // Start transaction
+    const connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Insert product
+      const [productResult] = await connection.query(
+        `INSERT INTO products (name, company, color, discount_percent, type, price, description)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [name, company, color, discount_percent, type, price, description || null]
+      );
+
+      const productId = productResult.insertId;
+
+      // Insert sizes with quantities
+      if (sizeData.length > 0) {
+        const sizePromises = sizeData.map(size => {
+          return connection.query(
+            `INSERT INTO product_sizes (product_id, size_code, size_label, stock) 
+             VALUES (?, ?, ?, ?)`,
+            [productId, size.code, size.label, size.stock || 0]
+          );
+        });
+        await Promise.all(sizePromises);
+      } else {
+        // Add default size if none provided
+        await connection.query(
+          `INSERT INTO product_sizes (product_id, size_code, size_label, stock) 
+           VALUES (?, ?, ?, ?)`,
+          [productId, 'M', 'Medium', 0]
+        );
+      }
+
+      // Upload images to Cloudinary
+      if (req.files && req.files.length > 0) {
+        const uploadPromises = req.files.map(file => uploadToCloudinary(file.buffer));
+        const imageUrls = await Promise.all(uploadPromises);
+
+        const insertPromises = imageUrls.map(url =>
+          connection.query("INSERT INTO product_images (product_id, image_url) VALUES (?, ?)", [productId, url])
+        );
+
+        await Promise.all(insertPromises);
+      }
+
+      await connection.commit();
+      res.status(201).json({ 
+        message: "Bidhaa imeongezwa kikamilifu", 
+        product_id: productId 
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
 
   } catch (err) {
     console.error("Add Product Error:", err);
@@ -59,18 +114,29 @@ exports.addProduct = async (req, res) => {
 };
 
 // ==========================
-// GET PRODUCTS
+// GET PRODUCTS (Updated for multiple sizes)
 // ==========================
 exports.getProducts = async (req, res) => {
   try {
     const [products] = await db.query("SELECT * FROM products ORDER BY created_at DESC");
 
     for (let product of products) {
+      // Get images
       const [images] = await db.query(
         "SELECT image_url FROM product_images WHERE product_id=?",
         [product.id]
       );
       product.images = images.map(img => img.image_url);
+
+      // Get sizes with stock
+      const [sizes] = await db.query(
+        "SELECT id, size_code, size_label, stock FROM product_sizes WHERE product_id=? ORDER BY size_code",
+        [product.id]
+      );
+      product.sizes = sizes;
+
+      // Calculate total stock
+      product.total_stock = sizes.reduce((sum, size) => sum + (size.stock || 0), 0);
     }
 
     res.json(products);
@@ -134,6 +200,44 @@ exports.deleteProduct = async (req, res) => {
     res.json({ message: "Bidhaa imefutwa kikamilifu" });
   } catch (err) {
     console.error("Delete Product Error:", err);
+    res.status(500).json({ message: "Hitilafu ya seva" });
+  }
+};
+// ==========================
+// GET PRODUCT SIZES
+// ==========================
+exports.getProductSizes = async (req, res) => {
+  try {
+    const { product_id } = req.params;
+    
+    const [sizes] = await db.query(
+      "SELECT id, size_code, size_label, stock FROM product_sizes WHERE product_id=? ORDER BY size_code",
+      [product_id]
+    );
+    
+    res.json(sizes);
+  } catch (err) {
+    console.error("Get Product Sizes Error:", err);
+    res.status(500).json({ message: "Hitilafu ya seva" });
+  }
+};
+
+// ==========================
+// UPDATE SIZE STOCK
+// ==========================
+exports.updateSizeStock = async (req, res) => {
+  try {
+    const { size_id } = req.params;
+    const { stock } = req.body;
+    
+    await db.query(
+      "UPDATE product_sizes SET stock=? WHERE id=?",
+      [stock, size_id]
+    );
+    
+    res.json({ message: "Akiba ya saizi imesasishwa kikamilifu" });
+  } catch (err) {
+    console.error("Update Size Stock Error:", err);
     res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };

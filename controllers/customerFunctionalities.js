@@ -585,19 +585,54 @@ async function getAllProducts(req, res) {
   }
 }
 
-// ---------------------- GET PRODUCT BY ID ----------------------
+// ---------------------- GET PRODUCT BY ID (Updated) ----------------------
 async function getProductById(req, res) {
   try {
     const { id } = req.params;
+    
+    // Get product with sizes
     const [rows] = await pool.execute(
-      `SELECT id, name, company, color, discount_percent, type, size_us, stock, price, created_at
-       FROM products WHERE id=?`,
+      `SELECT p.id, p.name, p.company, p.color, p.discount_percent, p.type, p.price, p.description, p.created_at,
+              ps.id as size_id, ps.size_code, ps.size_label, ps.stock
+       FROM products p
+       LEFT JOIN product_sizes ps ON p.id = ps.product_id
+       WHERE p.id=?
+       ORDER BY ps.size_code`,
       [id]
     );
 
     if (rows.length === 0) return res.status(404).json({ message: 'Bidhaa haijapatikana' });
 
-    const product = rows[0];
+    // Group sizes
+    const product = {
+      id: rows[0].id,
+      name: rows[0].name,
+      company: rows[0].company,
+      color: rows[0].color,
+      discount_percent: rows[0].discount_percent,
+      type: rows[0].type,
+      price: rows[0].price,
+      description: rows[0].description,
+      created_at: rows[0].created_at,
+      sizes: []
+    };
+
+    // Add sizes
+    rows.forEach(row => {
+      if (row.size_id) {
+        product.sizes.push({
+          id: row.size_id,
+          code: row.size_code,
+          label: row.size_label,
+          stock: row.stock
+        });
+      }
+    });
+
+    // Calculate total stock
+    product.total_stock = product.sizes.reduce((sum, size) => sum + (size.stock || 0), 0);
+
+    // Get images
     const [images] = await pool.execute(
       'SELECT image_url FROM product_images WHERE product_id = ? ORDER BY id',
       [id]
@@ -618,11 +653,11 @@ async function getProductById(req, res) {
   }
 }
 
-// ---------------------- PLACE ORDER ----------------------
+// ---------------------- PLACE ORDER (Updated for sizes) ----------------------
 async function placeOrder(req, res) {
   try {
     const customer_id = req.user.id;
-    const { items } = req.body;
+    const { items } = req.body; // items now include size_id
 
     if (!items || !Array.isArray(items) || items.length === 0)
       return res.status(400).json({ message: 'Vipengee vya agizo vinahitajika' });
@@ -630,48 +665,95 @@ async function placeOrder(req, res) {
     let totalAmount = 0;
     const orderItemsData = [];
 
-    for (let item of items) {
-      const { product_id, quantity } = item;
-      if (!product_id || !quantity || quantity < 1)
-        return res.status(400).json({ message: 'Bidhaa au idadi si sahihi' });
+    // Start transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
 
-      const [products] = await pool.execute(
-        'SELECT price, stock, discount_percent FROM products WHERE id = ?',
-        [product_id]
+    try {
+      for (let item of items) {
+        const { product_id, size_id, quantity } = item;
+        
+        if (!product_id || !size_id || !quantity || quantity < 1)
+          return res.status(400).json({ message: 'Bidhaa, saizi au idadi si sahihi' });
+
+        // Get product and size info
+        const [rows] = await connection.execute(
+          `SELECT p.price, p.discount_percent, ps.stock, ps.size_label
+           FROM products p
+           JOIN product_sizes ps ON p.id = ps.product_id
+           WHERE p.id = ? AND ps.id = ?`,
+          [product_id, size_id]
+        );
+        
+        if (rows.length === 0) 
+          return res.status(404).json({ message: `Bidhaa au saizi ${product_id}-${size_id} haijapatikana` });
+
+        const product = rows[0];
+        
+        // Check stock for specific size
+        if (product.stock < quantity)
+          return res.status(400).json({ 
+            message: `Hakuna akiba ya kutosha ya bidhaa hii (Saizi: ${product.size_label})` 
+          });
+
+        const discountPercent = product.discount_percent || 0;
+        const unitPrice = product.price * (1 - discountPercent / 100);
+        const lineTotal = unitPrice * quantity;
+
+        totalAmount += lineTotal;
+
+        orderItemsData.push({ 
+          product_id, 
+          size_id, 
+          quantity, 
+          unit_price: unitPrice, 
+          line_total: lineTotal 
+        });
+
+        // Reduce stock for specific size
+        await connection.execute(
+          'UPDATE product_sizes SET stock = stock - ? WHERE id = ?',
+          [quantity, size_id]
+        );
+      }
+
+      // Apply cart-level discount if 3 or more items
+      const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+      if (totalItems >= 3) totalAmount *= 0.9;
+
+      // Create order
+      const [orderResult] = await connection.execute(
+        'INSERT INTO orders (customer_id, total_price, status) VALUES (?, ?, ?)',
+        [customer_id, totalAmount, 'Imewekwa']
       );
-      if (products.length === 0) return res.status(404).json({ message: `Bidhaa ${product_id} haijapatikana` });
 
-      const product = products[0];
-      if (product.stock < quantity)
-        return res.status(400).json({ message: `Hakuna hesabu ya kutosha ya bidhaa ${product_id}` });
+      const order_id = orderResult.insertId;
 
-      const discountPercent = product.discount_percent || 0;
-      const unitPrice = product.price * (1 - discountPercent / 100);
-      const lineTotal = unitPrice * quantity;
+      // Insert order items with size info
+      for (let item of orderItemsData) {
+        await connection.execute(
+          `INSERT INTO order_items (order_id, product_id, size_id, quantity, unit_price, line_total) 
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [order_id, item.product_id, item.size_id, item.quantity, item.unit_price, item.line_total]
+        );
+      }
 
-      totalAmount += lineTotal;
+      await connection.commit();
 
-      orderItemsData.push({ product_id, quantity, unit_price: unitPrice, line_total: lineTotal });
+      res.status(201).json({ 
+        message: 'Agizo limewekwa kikamilifu', 
+        order_id, 
+        total_price: totalAmount, 
+        status: 'Imewekwa' 
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
 
-    if (items.length >= 3) totalAmount *= 0.9; // cart-level discount
-
-    const [orderResult] = await pool.execute(
-      'INSERT INTO orders (customer_id, total_price, status) VALUES (?, ?, ?)',
-      [customer_id, totalAmount, 'Imewekwa']
-    );
-
-    const order_id = orderResult.insertId;
-
-    for (let item of orderItemsData) {
-      await pool.execute(
-        'INSERT INTO order_items (order_id, product_id, quantity, unit_price, line_total) VALUES (?, ?, ?, ?, ?)',
-        [order_id, item.product_id, item.quantity, item.unit_price, item.line_total]
-      );
-      await pool.execute('UPDATE products SET stock = stock - ? WHERE id = ?', [item.quantity, item.product_id]);
-    }
-
-    res.status(201).json({ message: 'Agizo limewekwa kikamilifu', order_id, total_price: totalAmount, status: 'Imewekwa' });
   } catch (err) {
     console.error('Place Order Error:', err);
     res.status(500).json({ message: 'Hitilafu ya seva' });

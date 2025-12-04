@@ -4,11 +4,17 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const morgan = require('morgan');
 
+
 dotenv.config();
 const app = express();
 
 // ----------------- Middlewares -----------------
-app.use(cors());
+const corsOptions = {
+    origin: ['https://yourfrontenddomain.com', 'http://localhost:3000'],
+    credentials: true,
+    optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));

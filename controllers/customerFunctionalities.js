@@ -559,7 +559,7 @@ async function getAnnouncements(req, res) {
 async function getAllProducts(req, res) {
   try {
     const [products] = await pool.execute(
-      `SELECT id, name, company, color, discount_percent, type, size_us, stock, price, created_at
+      `SELECT id, name, company, color, discount_percent, type, price, created_at
        FROM products ORDER BY created_at DESC`
     );
 

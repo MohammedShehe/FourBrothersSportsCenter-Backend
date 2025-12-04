@@ -159,7 +159,7 @@ exports.updateProduct = async (req, res) => {
     }
 
     await db.query(
-      `UPDATE products SET name=?, company=?, color=?, discount_percent=?, type=?, size_us=?, stock=?, price=? 
+      `UPDATE products SET name=?, company=?, color=?, discount_percent=?, type=?, price=? 
        WHERE id=?`,
       [name, company, color, discount_percent, type, size_us, stock, price, id]
     );

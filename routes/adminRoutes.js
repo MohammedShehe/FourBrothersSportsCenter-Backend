@@ -50,6 +50,11 @@ router.delete('/ads/:id', adminAuth, notificationController.deleteAd);
 router.get('/notifications/customer', adminAuth, notificationController.viewCustomerNotifications);
 router.post('/notifications/send', adminAuth, notificationController.sendMessage);
 router.post('/messages', adminAuth, notificationController.sendInAppMessageOnly);
+router.get('/notifications/unread-counts', adminAuth, notificationController.getUnreadCounts);
+router.put('/notifications/mark-read/:notification_id', adminAuth, notificationController.markCustomerNotificationRead);
+router.put('/orders/mark-viewed/:order_id', adminAuth, notificationController.markOrderViewed);
+router.get('/orders', adminAuth, notificationController.getAllOrdersWithStatus);
+
 
 // ---------------- Orders ----------------
 router.get('/orders', adminAuth, notificationController.getAllOrders);

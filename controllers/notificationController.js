@@ -217,3 +217,117 @@ exports.updateOrderStatus = async (req, res) => {
     res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };
+
+// ---------------------- GET UNREAD NOTIFICATION COUNTS ----------------------
+exports.getUnreadCounts = async (req, res) => {
+  try {
+    // Count unread customer notifications
+    const [customerNotifications] = await db.query(`
+      SELECT COUNT(*) as count 
+      FROM customer_notifications cn
+      LEFT JOIN customer_notification_logs log ON cn.id = log.customer_notification_id
+      WHERE log.admin_viewed IS NULL OR log.admin_viewed = FALSE
+    `);
+
+    // Count new orders (orders placed today or not yet viewed)
+    const [orderNotifications] = await db.query(`
+      SELECT COUNT(*) as count 
+      FROM orders o
+      LEFT JOIN order_notifications onotif ON o.id = onotif.order_id
+      WHERE (onotif.admin_viewed IS NULL OR onotif.admin_viewed = FALSE)
+      AND o.status NOT IN ('Ghairishwa', 'Kurudishwa')
+    `);
+
+    res.json({
+      unread_customer_notifications: customerNotifications[0].count,
+      unread_order_notifications: orderNotifications[0].count
+    });
+  } catch (err) {
+    console.error("Get Unread Counts Error:", err);
+    res.status(500).json({ message: "Hitilafu ya seva" });
+  }
+};
+
+// ---------------------- MARK CUSTOMER NOTIFICATION AS READ ----------------------
+exports.markCustomerNotificationRead = async (req, res) => {
+  try {
+    const { notification_id } = req.params;
+    
+    // Check if notification exists
+    const [exists] = await db.query(
+      "SELECT id FROM customer_notifications WHERE id = ?",
+      [notification_id]
+    );
+    
+    if (exists.length === 0) {
+      return res.status(404).json({ message: "Arifa haijapatikana" });
+    }
+
+    // Insert or update notification log
+    await db.query(`
+      INSERT INTO customer_notification_logs (customer_notification_id, admin_viewed) 
+      VALUES (?, TRUE)
+      ON DUPLICATE KEY UPDATE admin_viewed = TRUE
+    `, [notification_id]);
+
+    res.json({ message: "Arifa imesomwa" });
+  } catch (err) {
+    console.error("Mark Notification Read Error:", err);
+    res.status(500).json({ message: "Hitilafu ya seva" });
+  }
+};
+
+// ---------------------- MARK ORDER AS VIEWED ----------------------
+exports.markOrderViewed = async (req, res) => {
+  try {
+    const { order_id } = req.params;
+    
+    // Check if order exists
+    const [exists] = await db.query(
+      "SELECT id FROM orders WHERE id = ?",
+      [order_id]
+    );
+    
+    if (exists.length === 0) {
+      return res.status(404).json({ message: "Agizo halijapatikana" });
+    }
+
+    // Insert or update order notification log
+    await db.query(`
+      INSERT INTO order_notifications (order_id, admin_viewed) 
+      VALUES (?, TRUE)
+      ON DUPLICATE KEY UPDATE admin_viewed = TRUE
+    `, [order_id]);
+
+    res.json({ message: "Agizo limewekewa alama kama lililosomwa" });
+  } catch (err) {
+    console.error("Mark Order Viewed Error:", err);
+    res.status(500).json({ message: "Hitilafu ya seva" });
+  }
+};
+
+// ---------------------- GET ALL ORDERS WITH VIEW STATUS ----------------------
+exports.getAllOrdersWithStatus = async (req, res) => {
+  try {
+    const [orders] = await db.query(`
+      SELECT o.id AS order_id, o.total_price, o.status, o.created_at,
+             c.first_name, c.last_name, c.phone,
+             p.name AS product_name, oi.quantity,
+             CASE 
+               WHEN onotif.admin_viewed = TRUE THEN 1
+               ELSE 0 
+             END as admin_viewed
+      FROM orders o
+      JOIN customers c ON o.customer_id = c.id
+      JOIN order_items oi ON oi.order_id = o.id
+      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN order_notifications onotif ON o.id = onotif.order_id
+      ORDER BY o.created_at DESC
+    `);
+    
+    res.json(orders);
+  } catch (err) {
+    console.error("Get Orders With Status Error:", err);
+    res.status(500).json({ message: "Hitilafu ya seva" });
+  }
+};

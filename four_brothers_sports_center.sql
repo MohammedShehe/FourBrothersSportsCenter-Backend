@@ -63,8 +63,35 @@ CREATE TABLE `ads` (
 
 LOCK TABLES `ads` WRITE;
 /*!40000 ALTER TABLE `ads` DISABLE KEYS */;
-INSERT INTO `ads` VALUES (11,'https://res.cloudinary.com/dmluieytq/image/upload/v1764555543/four_brothers_ads/gmo0kua9mgjmxua25xph.png','https://www.instagram.com/four_brothers_sports_center?igsh=d20xYno3dmlwcnJ4','2025-12-01 02:19:04'),(12,'https://res.cloudinary.com/dmluieytq/image/upload/v1764555613/four_brothers_ads/spclvh3qsitnxenzrgak.jpg','https://www.instagram.com/four_brothers_sports_center?igsh=d20xYno3dmlwcnJ4','2025-12-01 02:20:15'),(13,'https://res.cloudinary.com/dmluieytq/image/upload/v1764555631/four_brothers_ads/sqlumrtcmvmioo57gbbs.jpg','https://www.instagram.com/four_brothers_sports_center?igsh=d20xYno3dmlwcnJ4','2025-12-01 02:20:31');
+INSERT INTO `ads` VALUES (12,'https://res.cloudinary.com/dmluieytq/image/upload/v1764555613/four_brothers_ads/spclvh3qsitnxenzrgak.jpg','https://www.instagram.com/four_brothers_sports_center?igsh=d20xYno3dmlwcnJ4','2025-12-01 02:20:15'),(13,'https://res.cloudinary.com/dmluieytq/image/upload/v1764555631/four_brothers_ads/sqlumrtcmvmioo57gbbs.jpg','https://www.instagram.com/four_brothers_sports_center?igsh=d20xYno3dmlwcnJ4','2025-12-01 02:20:31');
 /*!40000 ALTER TABLE `ads` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `customer_notification_logs`
+--
+
+DROP TABLE IF EXISTS `customer_notification_logs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `customer_notification_logs` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `customer_notification_id` int NOT NULL,
+  `admin_viewed` tinyint(1) DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `customer_notification_id` (`customer_notification_id`),
+  CONSTRAINT `customer_notification_logs_ibfk_1` FOREIGN KEY (`customer_notification_id`) REFERENCES `customer_notifications` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `customer_notification_logs`
+--
+
+LOCK TABLES `customer_notification_logs` WRITE;
+/*!40000 ALTER TABLE `customer_notification_logs` DISABLE KEYS */;
+/*!40000 ALTER TABLE `customer_notification_logs` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -81,7 +108,7 @@ CREATE TABLE `customer_notifications` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `customer_id` (`customer_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -115,7 +142,7 @@ CREATE TABLE `customers` (
   `address` text,
   PRIMARY KEY (`id`),
   UNIQUE KEY `phone` (`phone`)
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -124,7 +151,7 @@ CREATE TABLE `customers` (
 
 LOCK TABLES `customers` WRITE;
 /*!40000 ALTER TABLE `customers` DISABLE KEYS */;
-INSERT INTO `customers` VALUES (12,'Mundhir','Shehe','0777730606','$2b$10$z3vr3K1.pzXxXhvjYbjNNO1Yo2wfMoovcMnAmkjHcxN90dwy1wEa2',NULL,NULL,'mosnake111@gmail.com','mwanaume','2025-11-30 20:48:14','2025-12-03 08:31:53','Fuoni Kisimani'),(13,'Haji','Haji','0677532140','$2b$10$z3vr3K1.pzXxXhvjYbjNNO1Yo2wfMoovcMnAmkjHcxN90dwy1wEa2',NULL,NULL,'fourbrothers10112627@gmail.com','mwanaume','2025-11-30 21:09:57','2025-12-03 08:31:53','Fuoni');
+INSERT INTO `customers` VALUES (12,'Mundhir','Shehe','0777730606','$2b$10$z3vr3K1.pzXxXhvjYbjNNO1Yo2wfMoovcMnAmkjHcxN90dwy1wEa2',NULL,NULL,'mosnake111@gmail.com','mwanaume','2025-11-30 20:48:14','2025-12-03 08:31:53','Fuoni Kisimani'),(13,'Haji','Haji','0677532140','$2b$10$z3vr3K1.pzXxXhvjYbjNNO1Yo2wfMoovcMnAmkjHcxN90dwy1wEa2',NULL,NULL,'fourbrothers10112627@gmail.com','mwanaume','2025-11-30 21:09:57','2025-12-03 08:31:53','Fuoni'),(15,'Ali','Ali','0123456789','$2b$10$fBo6BvzveQpF32nUw7k29uRpTK3q8XtTin0iySksuwHBRKCca.uky',NULL,NULL,'Mohammed11@gmail.com','mwanaume','2025-12-03 09:50:06','2025-12-03 09:50:06','Anuwani');
 /*!40000 ALTER TABLE `customers` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -169,7 +196,7 @@ CREATE TABLE `order_items` (
   PRIMARY KEY (`id`),
   KEY `fk_order_items_order` (`order_id`),
   KEY `fk_order_items_product` (`product_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -178,8 +205,35 @@ CREATE TABLE `order_items` (
 
 LOCK TABLES `order_items` WRITE;
 /*!40000 ALTER TABLE `order_items` DISABLE KEYS */;
-INSERT INTO `order_items` VALUES (9,9,13,3,60000.00,180000.00),(10,10,12,5,60000.00,300000.00),(11,11,13,6,60000.00,360000.00),(12,12,9,2,60000.00,120000.00);
+INSERT INTO `order_items` VALUES (9,9,13,3,60000.00,180000.00),(10,10,12,5,60000.00,300000.00),(11,11,13,6,60000.00,360000.00),(12,12,9,2,60000.00,120000.00),(13,13,20,1,60000.00,60000.00);
 /*!40000 ALTER TABLE `order_items` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `order_notifications`
+--
+
+DROP TABLE IF EXISTS `order_notifications`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `order_notifications` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `order_id` int NOT NULL,
+  `admin_viewed` tinyint(1) DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `order_id` (`order_id`),
+  CONSTRAINT `order_notifications_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `order_notifications`
+--
+
+LOCK TABLES `order_notifications` WRITE;
+/*!40000 ALTER TABLE `order_notifications` DISABLE KEYS */;
+/*!40000 ALTER TABLE `order_notifications` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -232,7 +286,7 @@ CREATE TABLE `orders` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `fk_orders_customer` (`customer_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -241,7 +295,7 @@ CREATE TABLE `orders` (
 
 LOCK TABLES `orders` WRITE;
 /*!40000 ALTER TABLE `orders` DISABLE KEYS */;
-INSERT INTO `orders` VALUES (10,10,300000.00,'Imepokelewa','2025-10-09 07:23:41','2025-10-09 07:25:08'),(9,9,180000.00,'Kurudishwa','2025-10-07 10:00:54','2025-10-07 10:07:29'),(11,11,360000.00,'Imepokelewa','2025-10-28 12:38:21','2025-10-28 12:39:58'),(12,11,120000.00,'Imepokelewa','2025-11-30 18:36:53','2025-11-30 18:38:32');
+INSERT INTO `orders` VALUES (9,9,180000.00,'Kurudishwa','2025-10-07 10:00:54','2025-10-07 10:07:29'),(10,10,300000.00,'Imepokelewa','2025-10-09 07:23:41','2025-10-09 07:25:08'),(11,11,360000.00,'Imepokelewa','2025-10-28 12:38:21','2025-10-28 12:39:58'),(12,11,120000.00,'Imepokelewa','2025-11-30 18:36:53','2025-11-30 18:38:32'),(13,15,60000.00,'Inasafirishwa','2025-12-03 09:51:23','2025-12-03 12:56:48');
 /*!40000 ALTER TABLE `orders` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -272,6 +326,36 @@ INSERT INTO `product_images` VALUES (85,21,'https://res.cloudinary.com/dmluieytq
 UNLOCK TABLES;
 
 --
+-- Table structure for table `product_sizes`
+--
+
+DROP TABLE IF EXISTS `product_sizes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_sizes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `size_code` varchar(10) NOT NULL,
+  `size_label` varchar(50) NOT NULL,
+  `stock` int DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_product_size` (`product_id`,`size_code`),
+  CONSTRAINT `product_sizes_ibfk_1` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `product_sizes`
+--
+
+LOCK TABLES `product_sizes` WRITE;
+/*!40000 ALTER TABLE `product_sizes` DISABLE KEYS */;
+INSERT INTO `product_sizes` VALUES (1,14,'M','Medium',5,'2025-12-04 11:51:49'),(2,15,'M','Medium',5,'2025-12-04 11:51:49'),(3,16,'M','Medium',20,'2025-12-04 11:51:49'),(4,17,'M','Medium',5,'2025-12-04 11:51:49'),(5,18,'M','Medium',5,'2025-12-04 11:51:49'),(6,19,'M','Medium',5,'2025-12-04 11:51:49'),(7,20,'M','Medium',4,'2025-12-04 11:51:49'),(8,21,'M','Medium',10,'2025-12-04 11:51:49'),(9,22,'M','Medium',10,'2025-12-04 11:51:49');
+/*!40000 ALTER TABLE `product_sizes` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `products`
 --
 
@@ -285,12 +369,11 @@ CREATE TABLE `products` (
   `color` varchar(50) DEFAULT NULL,
   `discount_percent` int DEFAULT '0',
   `type` enum('Njumu','Trainer','Njumu na Trainer') NOT NULL,
-  `size_us` varchar(10) NOT NULL,
-  `stock` int DEFAULT '0',
   `price` decimal(10,2) NOT NULL,
+  `description` text,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -299,7 +382,7 @@ CREATE TABLE `products` (
 
 LOCK TABLES `products` WRITE;
 /*!40000 ALTER TABLE `products` DISABLE KEYS */;
-INSERT INTO `products` VALUES (16,'AirZoom Trainer - Kiatu cha Kisasa','AirZoom','Buluu',0,'Trainer','43',20,60000.00,'2025-12-01 01:36:22'),(15,'Nike - Training ya Kwenda','Nike','Buluu',0,'Trainer','40',5,60000.00,'2025-12-01 01:32:52'),(14,'Nike - Toleo Jipya (Njumu)','Nike','Buluu',0,'Njumu','39',5,60000.00,'2025-12-01 01:28:40'),(17,'Mercurial Njumu','Mercurial','Nyeusi',0,'Njumu','42',5,60000.00,'2025-12-01 01:38:16'),(18,'AirZoom Njumu ','AirZoom','Nyeusi',0,'Njumu','41',5,60000.00,'2025-12-01 01:41:07'),(19,'Trainer ya Kisasa - Adimu','Mercurial','Nyeupe',0,'Trainer','40',5,60000.00,'2025-12-01 01:42:59'),(20,'Mercurial Njumu','Mercurial','Buluu',0,'Njumu','43',5,60000.00,'2025-12-01 01:45:58'),(21,'AirZoom - Njumu (goldish)','AirZoom','Nyeusi',0,'Njumu','42',10,60000.00,'2025-12-01 01:55:04'),(22,'Mercurial Trainer','Mercurial','Nyeusi',0,'Trainer','39',10,60000.00,'2025-12-01 01:57:29');
+INSERT INTO `products` VALUES (14,'Nike - Toleo Jipya (Njumu)','Nike','Buluu',0,'Njumu',60000.00,NULL,'2025-12-01 01:28:40'),(15,'Nike - Training ya Kwenda','Nike','Buluu',0,'Trainer',60000.00,NULL,'2025-12-01 01:32:52'),(16,'AirZoom Trainer - Kiatu cha Kisasa','AirZoom','Buluu',0,'Trainer',60000.00,NULL,'2025-12-01 01:36:22'),(17,'Mercurial Njumu','Mercurial','Nyeusi',0,'Njumu',60000.00,NULL,'2025-12-01 01:38:16'),(18,'AirZoom Njumu ','AirZoom','Nyeusi',0,'Njumu',60000.00,NULL,'2025-12-01 01:41:07'),(19,'Trainer ya Kisasa - Adimu','Mercurial','Nyeupe',0,'Trainer',60000.00,NULL,'2025-12-01 01:42:59'),(20,'Mercurial Njumu','Mercurial','Buluu',0,'Njumu',60000.00,NULL,'2025-12-01 01:45:58'),(21,'AirZoom - Njumu (goldish)','AirZoom','Nyeusi',0,'Njumu',60000.00,NULL,'2025-12-01 01:55:04'),(22,'Mercurial Trainer','Mercurial','Nyeusi',0,'Trainer',60000.00,NULL,'2025-12-01 01:57:29');
 /*!40000 ALTER TABLE `products` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -321,7 +404,7 @@ CREATE TABLE `users` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `mobile` (`mobile`)
-) ENGINE=MyISAM AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -330,7 +413,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,'Mohammed','Shehe','+917681969865','$2b$10$jJTrGY8T0gXwUTq4oQasCuBNz4eZb4Fl.PXO819ssh0RjgGZ/Ha8S',1,1,'2025-11-30 19:44:26'),(2,'Abdul-warith','Shehe','+255684897930','$2b$10$8DiEeIbsctke0IRwxzFR6.zz8w9Bv2i0urLtL7pn.Xql6S9JVwV9C',1,0,'2025-11-30 19:44:26'),(3,'Aminu','Juma','+255774730606','$2b$10$8DiEeIbsctke0IRwxzFR6.zz8w9Bv2i0urLtL7pn.Xql6S9JVwV9C',1,0,'2025-11-30 19:44:26'),(4,'Fahima','Issa','+255777730606','$2b$10$8DiEeIbsctke0IRwxzFR6.zz8w9Bv2i0urLtL7pn.Xql6S9JVwV9C',1,0,'2025-11-30 19:44:26'),(5,'Khayriya','Haji','+255717805380','$2b$10$8DiEeIbsctke0IRwxzFR6.zz8w9Bv2i0urLtL7pn.Xql6S9JVwV9C',1,0,'2025-11-30 19:44:26');
+INSERT INTO `users` VALUES (1,'Mohammed','Shehe','+917681969865','$2b$10$jJTrGY8T0gXwUTq4oQasCuBNz4eZb4Fl.PXO819ssh0RjgGZ/Ha8S',1,1,'2025-11-30 19:44:26'),(2,'Abdul-warith','Shehe','0684123456','$2b$10$Q1.V9UnD9jTcJb/1zkLob.h5ye7jzixnQ1AvHNzFsffmCzZcWV8ji',1,0,'2025-11-30 19:44:26'),(3,'Aminu','Juma','0774730606','$2b$10$QMWOjzTDF6FCHC3bE98WyOtlINjDABtNOUfI64YWaZNB77C1SEPgG',1,0,'2025-11-30 19:44:26'),(4,'Fahima','Issa','0777730606','$2b$10$8DiEeIbsctke0IRwxzFR6.zz8w9Bv2i0urLtL7pn.Xql6S9JVwV9C',1,0,'2025-11-30 19:44:26'),(5,'Khayriya','Haji','0717805380','$2b$10$LImG0ldFb7o/oDskWc6Rjur4uE7HDEgOXSOK5e70ey64kZDyoY03O',1,0,'2025-11-30 19:44:26'),(8,'MO','11','0677532140','$2b$10$4Cm7wcJmQAh5EVQQ1zNS3uz5sQHRs1UXOdUy32NuxvV07wNVNn1uO',1,0,'2025-12-03 12:54:45');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -343,4 +426,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-12-03 14:08:02
+-- Dump completed on 2025-12-04 19:35:10

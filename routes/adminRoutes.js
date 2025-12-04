@@ -30,6 +30,7 @@ router.post('/products', adminAuth, upload.array('images', 5), productController
 router.get('/products', adminAuth, productController.getProducts);
 router.put('/products/:id', adminAuth, upload.array('images', 5), productController.updateProduct);
 router.delete('/products/:id', adminAuth, productController.deleteProduct);
+router.get('/products/:id', adminAuth, productController.getProductById);
 
 // Product size management
 router.get('/products/:product_id/sizes', adminAuth, productController.getProductSizes);

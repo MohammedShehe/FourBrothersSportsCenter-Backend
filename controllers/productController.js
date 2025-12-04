@@ -147,6 +147,42 @@ exports.getProducts = async (req, res) => {
 };
 
 // ==========================
+// GET PRODUCT BY ID
+// ==========================
+exports.getProductById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const [products] = await db.query("SELECT * FROM products WHERE id=?", [id]);
+    
+    if (products.length === 0) {
+      return res.status(404).json({ message: "Bidhaa haijapatikana" });
+    }
+    
+    const product = products[0];
+    
+    // Get images
+    const [images] = await db.query(
+      "SELECT image_url FROM product_images WHERE product_id=?",
+      [id]
+    );
+    product.images = images.map(img => img.image_url);
+
+    // Get sizes with stock
+    const [sizes] = await db.query(
+      "SELECT id, size_code, size_label, stock FROM product_sizes WHERE product_id=? ORDER BY size_code",
+      [id]
+    );
+    product.sizes = sizes;
+
+    res.json(product);
+  } catch (err) {
+    console.error("Get Product By ID Error:", err);
+    res.status(500).json({ message: "Hitilafu ya seva" });
+  }
+};
+
+// ==========================
 // UPDATE PRODUCT
 // ==========================
 exports.updateProduct = async (req, res) => {

@@ -183,23 +183,25 @@ exports.getProductById = async (req, res) => {
 };
 
 // ==========================
-// UPDATE PRODUCT
+// UPDATE PRODUCT (Fixed for multiple sizes)
 // ==========================
 exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, company, color, discount_percent, type, size_us, stock, price } = req.body;
+    const { name, company, color, discount_percent, type, price, description } = req.body;
 
     if (!validTypes.includes(type)) {
       return res.status(400).json({ message: "Aina ya bidhaa si sahihi" });
     }
 
+    // Update product basic info
     await db.query(
-      `UPDATE products SET name=?, company=?, color=?, discount_percent=?, type=?, price=? 
+      `UPDATE products SET name=?, company=?, color=?, discount_percent=?, type=?, price=?, description=?
        WHERE id=?`,
-      [name, company, color, discount_percent, type, size_us, stock, price, id]
+      [name, company, color, discount_percent, type, price, description || null, id]
     );
 
+    // Handle image updates if new images uploaded
     if (req.files && req.files.length > 0) {
       // Delete old images
       await db.query("DELETE FROM product_images WHERE product_id=?", [id]);
@@ -219,6 +221,49 @@ exports.updateProduct = async (req, res) => {
 
   } catch (err) {
     console.error("Update Product Error:", err);
+    res.status(500).json({ message: "Hitilafu ya seva" });
+  }
+};
+
+// ==========================
+// GET PRODUCT WITH SIZES AND STOCK
+// ==========================
+exports.getProductWithSizes = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get product info
+    const [products] = await db.query(
+      "SELECT * FROM products WHERE id = ?",
+      [id]
+    );
+    
+    if (products.length === 0) {
+      return res.status(404).json({ message: "Bidhaa haijapatikana" });
+    }
+    
+    const product = products[0];
+    
+    // Get images
+    const [images] = await db.query(
+      "SELECT image_url FROM product_images WHERE product_id = ?",
+      [id]
+    );
+    product.images = images.map(img => img.image_url);
+    
+    // Get sizes with stock
+    const [sizes] = await db.query(
+      "SELECT id, size_code, size_label, stock FROM product_sizes WHERE product_id = ? ORDER BY size_code",
+      [id]
+    );
+    product.sizes = sizes;
+    
+    // Calculate total stock
+    product.total_stock = sizes.reduce((sum, size) => sum + (size.stock || 0), 0);
+    
+    res.json(product);
+  } catch (err) {
+    console.error("Get Product With Sizes Error:", err);
     res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };

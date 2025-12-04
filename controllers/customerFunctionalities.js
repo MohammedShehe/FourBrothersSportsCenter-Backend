@@ -555,21 +555,35 @@ async function getAnnouncements(req, res) {
   }
 }
 
-// ---------------------- GET ALL PRODUCTS ----------------------
+// ---------------------- GET ALL PRODUCTS FOR CUSTOMERS ----------------------
 async function getAllProducts(req, res) {
   try {
     const [products] = await pool.execute(
-      `SELECT id, name, company, color, discount_percent, type, price, description, created_at
-       FROM products ORDER BY created_at DESC`
+      `SELECT p.id, p.name, p.company, p.color, p.discount_percent, 
+              p.type, p.price, p.description, p.created_at,
+              SUM(ps.stock) as total_stock
+       FROM products p
+       LEFT JOIN product_sizes ps ON p.id = ps.product_id
+       GROUP BY p.id
+       ORDER BY p.created_at DESC`
     );
 
     for (let product of products) {
+      // Get images
       const [images] = await pool.execute(
         'SELECT image_url FROM product_images WHERE product_id = ? ORDER BY id',
         [product.id]
       );
       product.images = images.map(img => img.image_url);
 
+      // Get all sizes with their individual stock
+      const [sizes] = await pool.execute(
+        'SELECT id, size_code, size_label, stock FROM product_sizes WHERE product_id = ? ORDER BY size_code',
+        [product.id]
+      );
+      product.sizes = sizes;
+
+      // Calculate final price with discount
       if (product.discount_percent && product.discount_percent > 0) {
         const discount = (product.price * product.discount_percent) / 100;
         product.final_price = product.price - discount;
@@ -585,52 +599,25 @@ async function getAllProducts(req, res) {
   }
 }
 
-// ---------------------- GET PRODUCT BY ID (Updated) ----------------------
+// ---------------------- GET PRODUCT BY ID FOR CUSTOMERS ----------------------
 async function getProductById(req, res) {
   try {
     const { id } = req.params;
     
-    // Get product with sizes
+    // Get product basic info
     const [rows] = await pool.execute(
-      `SELECT p.id, p.name, p.company, p.color, p.discount_percent, p.type, p.price, p.description, p.created_at,
-              ps.id as size_id, ps.size_code, ps.size_label, ps.stock
+      `SELECT p.id, p.name, p.company, p.color, p.discount_percent, 
+              p.type, p.price, p.description, p.created_at
        FROM products p
-       LEFT JOIN product_sizes ps ON p.id = ps.product_id
-       WHERE p.id=?
-       ORDER BY ps.size_code`,
+       WHERE p.id = ?`,
       [id]
     );
 
-    if (rows.length === 0) return res.status(404).json({ message: 'Bidhaa haijapatikana' });
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Bidhaa haijapatikana' });
+    }
 
-    // Group sizes
-    const product = {
-      id: rows[0].id,
-      name: rows[0].name,
-      company: rows[0].company,
-      color: rows[0].color,
-      discount_percent: rows[0].discount_percent,
-      type: rows[0].type,
-      price: rows[0].price,
-      description: rows[0].description,
-      created_at: rows[0].created_at,
-      sizes: []
-    };
-
-    // Add sizes
-    rows.forEach(row => {
-      if (row.size_id) {
-        product.sizes.push({
-          id: row.size_id,
-          code: row.size_code,
-          label: row.size_label,
-          stock: row.stock
-        });
-      }
-    });
-
-    // Calculate total stock
-    product.total_stock = product.sizes.reduce((sum, size) => sum + (size.stock || 0), 0);
+    const product = rows[0];
 
     // Get images
     const [images] = await pool.execute(
@@ -639,6 +626,20 @@ async function getProductById(req, res) {
     );
     product.images = images.map(img => img.image_url);
 
+    // Get all sizes with stock
+    const [sizes] = await pool.execute(
+      `SELECT id, size_code, size_label, stock 
+       FROM product_sizes 
+       WHERE product_id = ? 
+       ORDER BY size_code`,
+      [id]
+    );
+    product.sizes = sizes;
+
+    // Calculate total stock
+    product.total_stock = sizes.reduce((sum, size) => sum + (size.stock || 0), 0);
+
+    // Calculate final price with discount
     if (product.discount_percent && product.discount_percent > 0) {
       const discount = (product.price * product.discount_percent) / 100;
       product.final_price = product.price - discount;

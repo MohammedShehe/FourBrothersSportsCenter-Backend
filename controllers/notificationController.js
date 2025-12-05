@@ -3,7 +3,7 @@
 const db = require('../config/database');
 const { sendBulkEmail } = require('../utils/helpers');
 const cloudinary = require('../config/cloudinary');
-
+const bcrypt = require('bcrypt');
 
 // ---------------- Ads Management ----------------
 exports.postAd = async (req, res) => {
@@ -198,20 +198,68 @@ exports.getAllOrders = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
   try {
     const { order_id } = req.params;
-    const { status } = req.body;
+    const { status, customer_password } = req.body;
 
-    // Allowed statuses without OTP confirmation
+    // Allowed statuses without password
     const allowedStatuses = ['Imewekwa', 'Inasafirishwa', 'Ghairishwa', 'Kurudishwa'];
     
-    if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({ message: "Hali si sahihi" });
+    if (allowedStatuses.includes(status)) {
+      // Update status normally (no password needed)
+      const [result] = await db.query("UPDATE orders SET status=? WHERE id=?", [status, order_id]);
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "Agizo halijapatikana" });
+      }
+
+      return res.json({ message: "Hali ya agizo imesasishwa kikamilifu" });
     }
 
-    const [result] = await db.query("UPDATE orders SET status=? WHERE id=?", [status, order_id]);
+    // --- SPECIAL HANDLING FOR "Imepokelewa" ---
+    if (status === 'Imepokelewa') {
+      if (!customer_password) {
+        return res.status(400).json({ 
+          message: "Nenosiri la mteja linahitajika kudhibitisha kupokea agizo" 
+        });
+      }
 
-    if (result.affectedRows === 0) return res.status(404).json({ message: "Agizo halijapatikana" });
+      // Get order with customer info
+      const [orderRows] = await db.query(`
+        SELECT o.*, c.password as customer_password_hash 
+        FROM orders o 
+        JOIN customers c ON o.customer_id = c.id 
+        WHERE o.id = ?
+      `, [order_id]);
 
-    res.json({ message: "Hali ya agizo imesasishwa kikamilifu" });
+      if (orderRows.length === 0) {
+        return res.status(404).json({ message: "Agizo halijapatikana" });
+      }
+
+      const order = orderRows[0];
+
+      // Verify current status
+      if (order.status !== 'Inasafirishwa') {
+        return res.status(400).json({ 
+          message: "Agizo haliko tayari kuwekewa alama kama lililopokelewa" 
+        });
+      }
+
+      // Verify customer password
+      const isPasswordValid = await bcrypt.compare(customer_password, order.customer_password_hash);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Nenosiri la mteja si sahihi" });
+      }
+
+      // Update order status to received
+      await db.query("UPDATE orders SET status='Imepokelewa' WHERE id=?", [order_id]);
+
+      return res.json({ 
+        message: "Kupokea agizo kumethibitishwa kikamilifu. Hali imebadilishwa kuwa 'Imepokelewa'." 
+      });
+    }
+
+    // If status is not recognized
+    return res.status(400).json({ message: "Hali ya agizo si sahihi" });
+
   } catch (err) {
     console.error("Update Order Status Error:", err);
     res.status(500).json({ message: "Hitilafu ya seva" });

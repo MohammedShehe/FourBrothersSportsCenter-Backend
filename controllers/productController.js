@@ -32,7 +32,7 @@ exports.addProduct = async (req, res) => {
       type, 
       price, 
       description,
-      sizes // New: JSON string containing sizes and stocks
+      sizes 
     } = req.body;
 
     if (!validTypes.includes(type)) {
@@ -186,44 +186,111 @@ exports.getProductById = async (req, res) => {
 // UPDATE PRODUCT (Fixed for multiple sizes)
 // ==========================
 exports.updateProduct = async (req, res) => {
+  const connection = await db.getConnection();
+
   try {
     const { id } = req.params;
-    const { name, company, color, discount_percent, type, price, description } = req.body;
+    const { 
+      name, 
+      company, 
+      color, 
+      discount_percent, 
+      type, 
+      price, 
+      description,
+      sizes 
+    } = req.body;
 
     if (!validTypes.includes(type)) {
       return res.status(400).json({ message: "Aina ya bidhaa si sahihi" });
     }
 
-    // Update product basic info
-    await db.query(
-      `UPDATE products SET name=?, company=?, color=?, discount_percent=?, type=?, price=?, description=?
+    // Parse sizes (JSON)
+    let sizeData = [];
+    if (sizes) {
+      try {
+        sizeData = JSON.parse(sizes);
+      } catch (err) {
+        return res.status(400).json({ message: "Maelezo ya saizi si sahihi" });
+      }
+    }
+
+    // Begin transaction
+    await connection.beginTransaction();
+
+    // ---------------------------
+    // UPDATE PRODUCT BASIC INFO
+    // ---------------------------
+    await connection.query(
+      `UPDATE products 
+       SET name=?, company=?, color=?, discount_percent=?, type=?, price=?, description=?
        WHERE id=?`,
       [name, company, color, discount_percent, type, price, description || null, id]
     );
 
-    // Handle image updates if new images uploaded
+    // ---------------------------
+    // UPDATE PRODUCT SIZES
+    // ---------------------------
+
+    // Delete old sizes
+    await connection.query(`DELETE FROM product_sizes WHERE product_id=?`, [id]);
+
+    if (sizeData.length > 0) {
+      const sizePromises = sizeData.map(size => {
+        return connection.query(
+          `INSERT INTO product_sizes (product_id, size_code, size_label, stock)
+           VALUES (?, ?, ?, ?)`,
+          [id, size.code, size.label, size.stock || 0]
+        );
+      });
+      await Promise.all(sizePromises);
+    } else {
+      // Insert default size if none provided
+      await connection.query(
+        `INSERT INTO product_sizes (product_id, size_code, size_label, stock)
+         VALUES (?, ?, ?, ?)`,
+        [id, 'M', 'Medium', 0]
+      );
+    }
+
+    // ---------------------------
+    // UPDATE IMAGES (IF NEW)
+    // ---------------------------
     if (req.files && req.files.length > 0) {
       // Delete old images
-      await db.query("DELETE FROM product_images WHERE product_id=?", [id]);
+      await connection.query(`DELETE FROM product_images WHERE product_id=?`, [id]);
 
-      // Upload new images
       const uploadPromises = req.files.map(file => uploadToCloudinary(file.buffer));
       const imageUrls = await Promise.all(uploadPromises);
 
       const insertPromises = imageUrls.map(url =>
-        db.query("INSERT INTO product_images (product_id, image_url) VALUES (?, ?)", [id, url])
+        connection.query(
+          `INSERT INTO product_images (product_id, image_url) VALUES (?, ?)`,
+          [id, url]
+        )
       );
 
       await Promise.all(insertPromises);
     }
 
+    // ---------------------------
+    // COMMIT
+    // ---------------------------
+    await connection.commit();
+
     res.json({ message: "Bidhaa imesasishwa kikamilifu" });
 
   } catch (err) {
     console.error("Update Product Error:", err);
+
+    if (connection) await connection.rollback();
     res.status(500).json({ message: "Hitilafu ya seva" });
+
+  } finally {
+    if (connection) connection.release();
   }
 };
+
 
 // ==========================
 // GET PRODUCT WITH SIZES AND STOCK

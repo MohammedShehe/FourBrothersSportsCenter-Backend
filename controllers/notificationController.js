@@ -1,4 +1,4 @@
-// controllers/notificationController.js - COMPLETE VERSION
+// controllers/notificationController.js - UPDATED VERSION
 
 const db = require('../config/database');
 const { sendBulkEmail } = require('../utils/helpers');
@@ -206,30 +206,43 @@ exports.getAllOrders = async (req, res) => {
   }
 };
 
-// ---------------- Update Order Status ----------------
+// ---------------- Update Order Status (AUTO VIEW) ----------------
 exports.updateOrderStatus = async (req, res) => {
   try {
     const { order_id } = req.params;
     const { status, customer_password } = req.body;
 
     // Allowed statuses without password
-    const allowedStatuses = ['Imewekwa', 'Inasafirishwa', 'Ghairishwa', 'Kurudishwa'];
-    
+    const allowedStatuses = ['Imewekwa', 'Inaandaliwa', 'Inasafirishwa', 'Ghairishwa', 'Kurudishwa'];
+
+    // NORMAL STATUS UPDATE
     if (allowedStatuses.includes(status)) {
-      const [result] = await db.query("UPDATE orders SET status=? WHERE id=?", [status, order_id]);
+      const [result] = await db.query(
+        "UPDATE orders SET status=? WHERE id=?",
+        [status, order_id]
+      );
 
       if (result.affectedRows === 0) {
         return res.status(404).json({ message: "Agizo halijapatikana" });
       }
 
-      return res.json({ message: "Hali ya agizo imesasishwa kikamilifu" });
+      // ★ AUTO MARK AS VIEWED ★
+      await db.query(`
+        INSERT INTO order_notifications (order_id, admin_viewed)
+        VALUES (?, TRUE)
+        ON DUPLICATE KEY UPDATE admin_viewed = TRUE
+      `, [order_id]);
+
+      return res.json({
+        message: "Hali ya agizo imesasishwa kikamilifu (Admin ameona agizo)"
+      });
     }
 
     // --- SPECIAL HANDLING FOR "Imepokelewa" ---
     if (status === 'Imepokelewa') {
       if (!customer_password) {
-        return res.status(400).json({ 
-          message: "Nenosiri la mteja linahitajika kudhibitisha kupokea agizo" 
+        return res.status(400).json({
+          message: "Nenosiri la mteja linahitajika kudhibitisha kupokea agizo"
         });
       }
 
@@ -247,8 +260,8 @@ exports.updateOrderStatus = async (req, res) => {
       const order = orderRows[0];
 
       if (order.status !== 'Inasafirishwa') {
-        return res.status(400).json({ 
-          message: "Agizo haliko tayari kuwekewa alama kama lililopokelewa" 
+        return res.status(400).json({
+          message: "Agizo haliko tayari kuwekewa alama kama lililopokelewa"
         });
       }
 
@@ -259,8 +272,15 @@ exports.updateOrderStatus = async (req, res) => {
 
       await db.query("UPDATE orders SET status='Imepokelewa' WHERE id=?", [order_id]);
 
-      return res.json({ 
-        message: "Kupokea agizo kumethibitishwa kikamilifu. Hali imebadilishwa kuwa 'Imepokelewa'." 
+      // ★ AUTO MARK AS VIEWED ★
+      await db.query(`
+        INSERT INTO order_notifications (order_id, admin_viewed)
+        VALUES (?, TRUE)
+        ON DUPLICATE KEY UPDATE admin_viewed = TRUE
+      `, [order_id]);
+
+      return res.json({
+        message: "Kupokea agizo kumethibitishwa kikamilifu. Hali imebadilishwa kuwa 'Imepokelewa'."
       });
     }
 
@@ -275,7 +295,6 @@ exports.updateOrderStatus = async (req, res) => {
 // ---------------- Get Unread Notification Counts ----------------
 exports.getUnreadCounts = async (req, res) => {
   try {
-    // Count unread customer notifications
     const [customerNotifications] = await db.query(`
       SELECT COUNT(*) as count 
       FROM customer_notifications cn
@@ -283,7 +302,6 @@ exports.getUnreadCounts = async (req, res) => {
       WHERE log.admin_viewed IS NULL OR log.admin_viewed = FALSE
     `);
 
-    // Count new orders (not yet viewed by admin)
     const [orderNotifications] = await db.query(`
       SELECT COUNT(*) as count 
       FROM orders o
@@ -306,27 +324,25 @@ exports.getUnreadCounts = async (req, res) => {
 exports.markCustomerNotificationRead = async (req, res) => {
   try {
     const { notification_id } = req.params;
-    
-    // Check if notification exists
+
     const [exists] = await db.query(
       "SELECT id FROM customer_notifications WHERE id = ?",
       [notification_id]
     );
-    
+
     if (exists.length === 0) {
       return res.status(404).json({ message: "Arifa haijapatikana" });
     }
 
-    // Insert or update notification log
     await db.query(`
       INSERT INTO customer_notification_logs (customer_notification_id, admin_viewed) 
       VALUES (?, TRUE)
       ON DUPLICATE KEY UPDATE admin_viewed = TRUE
     `, [notification_id]);
 
-    res.json({ 
+    res.json({
       message: "Arifa imewekewa alama kama iliosomwa",
-      success: true 
+      success: true
     });
   } catch (err) {
     console.error("Mark Notification Read Error:", err);
@@ -334,31 +350,29 @@ exports.markCustomerNotificationRead = async (req, res) => {
   }
 };
 
-// ---------------- Mark Order as Viewed ----------------
+// ---------------- Mark Order as Viewed (optional left) ----------------
 exports.markOrderViewed = async (req, res) => {
   try {
     const { order_id } = req.params;
-    
-    // Check if order exists
+
     const [exists] = await db.query(
       "SELECT id FROM orders WHERE id = ?",
       [order_id]
     );
-    
+
     if (exists.length === 0) {
       return res.status(404).json({ message: "Agizo halijapatikana" });
     }
 
-    // Insert or update order notification log
     await db.query(`
       INSERT INTO order_notifications (order_id, admin_viewed) 
       VALUES (?, TRUE)
       ON DUPLICATE KEY UPDATE admin_viewed = TRUE
     `, [order_id]);
 
-    res.json({ 
+    res.json({
       message: "Agizo limewekewa alama kama lililosomwa",
-      success: true 
+      success: true
     });
   } catch (err) {
     console.error("Mark Order Viewed Error:", err);
@@ -369,7 +383,6 @@ exports.markOrderViewed = async (req, res) => {
 // ---------------- Mark All Notifications as Read ----------------
 exports.markAllNotificationsAsRead = async (req, res) => {
   try {
-    // Get all unread notifications
     const [unreadNotifications] = await db.query(`
       SELECT cn.id 
       FROM customer_notifications cn
@@ -377,7 +390,6 @@ exports.markAllNotificationsAsRead = async (req, res) => {
       WHERE log.admin_viewed IS NULL OR log.admin_viewed = FALSE
     `);
 
-    // Mark each as read
     for (const notification of unreadNotifications) {
       await db.query(`
         INSERT INTO customer_notification_logs (customer_notification_id, admin_viewed) 
@@ -386,43 +398,12 @@ exports.markAllNotificationsAsRead = async (req, res) => {
       `, [notification.id]);
     }
 
-    res.json({ 
+    res.json({
       message: "Arifa zote zimewekewa alama kama zilisomwa",
-      success: true 
+      success: true
     });
   } catch (err) {
     console.error("Mark All Notifications Read Error:", err);
-    res.status(500).json({ message: "Hitilafu ya seva" });
-  }
-};
-
-// ---------------- Mark All Orders as Viewed ----------------
-exports.markAllOrdersAsViewed = async (req, res) => {
-  try {
-    // Get all unviewed orders
-    const [unviewedOrders] = await db.query(`
-      SELECT o.id 
-      FROM orders o
-      LEFT JOIN order_notifications onotif ON o.id = onotif.order_id
-      WHERE (onotif.admin_viewed IS NULL OR onotif.admin_viewed = FALSE)
-      AND o.status NOT IN ('Ghairishwa', 'Kurudishwa')
-    `);
-
-    // Mark each as viewed
-    for (const order of unviewedOrders) {
-      await db.query(`
-        INSERT INTO order_notifications (order_id, admin_viewed) 
-        VALUES (?, TRUE)
-        ON DUPLICATE KEY UPDATE admin_viewed = TRUE
-      `, [order.id]);
-    }
-
-    res.json({ 
-      message: "Maagizo yote yamewekewa alama kama yalisomwa",
-      success: true 
-    });
-  } catch (err) {
-    console.error("Mark All Orders Viewed Error:", err);
     res.status(500).json({ message: "Hitilafu ya seva" });
   }
 };

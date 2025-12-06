@@ -53,13 +53,10 @@ router.post('/notifications/send', adminAuth, notificationController.sendMessage
 router.post('/messages', adminAuth, notificationController.sendInAppMessageOnly);
 router.get('/notifications/unread-counts', adminAuth, notificationController.getUnreadCounts);
 router.put('/notifications/mark-read/:notification_id', adminAuth, notificationController.markCustomerNotificationRead);
-router.put('/notifications/mark-all-read', adminAuth, notificationController.markAllNotificationsAsRead);
 router.get('/announcements', adminAuth, notificationController.getAnnouncements);
 
 // ---------------- Orders ----------------
-router.get('/orders', adminAuth, notificationController.getAllOrders); // Changed back to getAllOrders
+router.get('/orders', adminAuth, notificationController.getAllOrders);
 router.put('/orders/:order_id/status', adminAuth, notificationController.updateOrderStatus);
-router.put('/orders/mark-viewed/:order_id', adminAuth, notificationController.markOrderViewed);
-router.put('/orders/mark-all-viewed', adminAuth, notificationController.markAllOrdersAsViewed);
 
 module.exports = router;

@@ -181,7 +181,7 @@ exports.sendInAppMessageOnly = async (req, res) => {
 exports.getAllOrders = async (req, res) => {
   try {
     const [orders] = await db.query(`
-      SELECT 
+      SELECT DISTINCT
         o.id AS order_id, 
         o.total_price, 
         o.status,
@@ -189,14 +189,16 @@ exports.getAllOrders = async (req, res) => {
         c.first_name, 
         c.last_name, 
         c.phone,
-        p.name AS product_name, 
-        oi.quantity,
+        GROUP_CONCAT(p.name SEPARATOR ', ') AS product_names,
+        SUM(oi.quantity) as total_quantity,
         COALESCE(onotif.admin_viewed, FALSE) as admin_viewed
       FROM orders o
       JOIN customers c ON o.customer_id = c.id
       JOIN order_items oi ON oi.order_id = o.id
       JOIN products p ON oi.product_id = p.id
       LEFT JOIN order_notifications onotif ON o.id = onotif.order_id
+      GROUP BY o.id, o.total_price, o.status, o.created_at, 
+               c.first_name, c.last_name, c.phone, onotif.admin_viewed
       ORDER BY o.created_at DESC
     `);
     res.json(orders);

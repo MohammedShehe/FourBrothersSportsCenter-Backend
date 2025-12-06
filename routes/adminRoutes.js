@@ -11,7 +11,7 @@ const customerController = require('../controllers/customerController');
 const notificationController = require('../controllers/notificationController');
 
 // ---------------- Authentication ----------------
-router.post('/login', adminController.adminLogin); // Changed to adminLogin
+router.post('/login', adminController.adminLogin);
 router.post('/forgot-password', adminController.forgotPassword);
 router.post('/reset-password', adminController.resetPassword);
 router.post('/change-mobile', adminController.changeMobile);
@@ -53,13 +53,13 @@ router.post('/notifications/send', adminAuth, notificationController.sendMessage
 router.post('/messages', adminAuth, notificationController.sendInAppMessageOnly);
 router.get('/notifications/unread-counts', adminAuth, notificationController.getUnreadCounts);
 router.put('/notifications/mark-read/:notification_id', adminAuth, notificationController.markCustomerNotificationRead);
-router.put('/orders/mark-viewed/:order_id', adminAuth, notificationController.markOrderViewed);
-router.get('/orders', adminAuth, notificationController.getAllOrdersWithStatus);
-
+router.put('/notifications/mark-all-read', adminAuth, notificationController.markAllNotificationsAsRead);
+router.get('/announcements', adminAuth, notificationController.getAnnouncements);
 
 // ---------------- Orders ----------------
-router.get('/orders', adminAuth, notificationController.getAllOrders);
+router.get('/orders', adminAuth, notificationController.getAllOrders); // Changed back to getAllOrders
 router.put('/orders/:order_id/status', adminAuth, notificationController.updateOrderStatus);
-// OTP routes removed - password confirmation handled on customer side
+router.put('/orders/mark-viewed/:order_id', adminAuth, notificationController.markOrderViewed);
+router.put('/orders/mark-all-viewed', adminAuth, notificationController.markAllOrdersAsViewed);
 
 module.exports = router;

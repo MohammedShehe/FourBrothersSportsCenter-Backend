@@ -1,8 +1,8 @@
 const db = require('../config/database');
 const cloudinary = require('../config/cloudinary');
 
-// Allowed product types
-const validTypes = ['Njumu', 'Trainer', 'Njumu na Trainer'];
+// Allowed product types - UPDATED
+const validTypes = ['Njumu', 'Trainer', 'Njumu na Trainer', 'Nguo', 'Nyengine'];
 
 // Helper function to upload buffer to Cloudinary
 const uploadToCloudinary = (fileBuffer) => {
